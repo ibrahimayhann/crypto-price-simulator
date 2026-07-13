@@ -325,11 +325,51 @@ Henüz simülasyon çalıştırılmadıysa HTTP `404 Not Found` döner.
 
 ## 10. Tasarım Kararları
 
+```markdown
+### Seed ile Görev Üretimi
+
+`TaskProducer`, istekte kullanılan seed değeriyle bir `Random` nesnesi
+oluşturur. Aynı seed ve aynı update sayısı, aynı `PriceUpdateTask` listesini
+üretir. Bu sayede hatalar yeniden oluşturulabilir ve expected, unsafe ve safe
+çalıştırmalar aynı iş yüküyle karşılaştırılabilir.
+
+Görevler yalnızca bir kez üretilir. Üretilen liste `List.copyOf()` ile
+immutable hâle getirilir ve expected, unsafe ve safe simülasyon aşamalarında
+yeniden kullanılır.
+
+Task sequence değerleri 1'den başlar. Coin değerleri BTC, ETH ve SOL arasından
+seçilir. Delta aralığı takım kararı olarak `-100..100`, sıfır hariç
+belirlenmiştir.
+
+### BlockingQueue Seçimi
+
+Producer–Consumer iletişiminde sınırlı kapasiteli `ArrayBlockingQueue`
+kullanılmıştır.
+
+Sınırlı kapasite:
+
+- Kuyruğun kontrolsüz biçimde büyümesini engeller.
+- Bellek kullanımını sınırlar.
+- Producer consumer'lardan hızlıysa `put()` üzerinden backpressure sağlar.
+- Queue boşken `take()` worker'ın busy waiting yapmadan beklemesini sağlar.
+
+`LinkedBlockingQueue` da ödev kapsamında kullanılabilir bir alternatifti.
+Ancak kapasite belirtilmeden kullanıldığında producer hızlı, consumer yavaşsa
+bekleyen görev sayısı çok fazla büyüyebilir. Bu nedenle sınırlı
+`ArrayBlockingQueue` tercih edilmiştir.
+
+BlockingQueue yalnızca görevlerin güvenli biçimde dağıtılmasını sağlar.
+Queue'dan alınan `CoinState` nesnelerinin thread safety'si ayrıca coin başına
+`ReentrantLock` ile sağlanmaktadır.
+---------------------------------------------------------------------------------------------------------------------------------
+
+
 Bu tablo kod tamamlandığında gerçek implementasyonla birebir doğrulanmalıdır.
 
 | Karar noktası | Kararımız | Neden ve alternatif |
 |---|---|---|
-| Görev kuyruğu | `ArrayBlockingQueue` | Sınırlı kapasite bellek büyümesini kontrol eder ve backpressure davranışını görünür kılar. `LinkedBlockingQueue` daha kolaydır ancak kapasitesiz kullanımda producer consumer'dan hızlıysa büyüyebilir. |
+| Görev üretimi | `Random(seed)` + immutable `List` | Aynı seed ile aynı iş yükünü üretmek ve expected/unsafe/safe karşılaştırmasını geçerli kılmak için |
+| Görev kuyruğu | Sınırlı `ArrayBlockingQueue` | Kontrolsüz bellek büyümesini engellemek ve backpressure sağlamak için |
 | Queue kapasitesi | `Math.max(1, Math.min(updates, 1_000))` | Küçük çalışmalarda gereksiz büyük kuyruk oluşturmaz; büyük çalışmalarda kuyruğu 1.000 görevle sınırlayıp producer üzerinde gerçek backpressure oluşturur. |
 | Worker havuzu | `Executors.newFixedThreadPool(workers, threadFactory)` | Her görev için `new Thread()` açılmaz; thread sayısı sınırlanır ve worker'lar tekrar kullanılır. |
 | Güvenli sayaç | `AtomicLong` | Tek değişkenli atomik artırma için lock'tan daha sade ve uygundur. |
