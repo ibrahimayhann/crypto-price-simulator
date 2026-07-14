@@ -1,265 +1,309 @@
 # Issue ve Ekip Çalışma Planı
 
-Bu dosya, bir haftalık geliştirme sürecinde issue → branch → PR → review akışını ve bağımlılıkları gösterir. Issue numaraları GitHub'da oluşturulduktan sonra tablo numaraları gerçek issue linkleriyle güncellenmelidir.
+Bu dosya repository'deki gerçek `#1–#20` issue yapısının tek kaynağıdır.
+Eski A–E rol tablosu ve 14 issue'luk plan kullanılmaz.
 
-## 1. Ekip Rolleri
+## 1. Ekip
 
-| Kod | Rol | Ana sorumluluk |
-|---|---|---|
-| A | Coin & State | Safe/unsafe coin state, snapshot, ReentrantLock |
-| B | Producer & Worker Pool | Immutable task, seed producer, queue, worker |
-| C | Counter & Invariant | Safe/unsafe counter, expected, invariant |
-| D | API & Swagger | Controller, DTO, validation, exceptions, OpenAPI |
-| E | Engine & Entegrasyon | Engine, service, stats, shutdown, thread dump, Git koordinasyonu |
+| Üye | Rol |
+|---|---|
+| İbrahim | Geliştirici — model, state, counter, metrics |
+| Fırat | Geliştirici — producer, queue, worker, engine lifecycle, evidence |
+| Ahmet | Geliştirici — API, service, validation, Swagger, integration |
+| Cem Bora | Ar-Ge — review, requirements traceability, issue doğrulama |
+| Tolga | Ar-Ge — review, teslim raporu, final doğrulama |
 
-İsimler kesinleşince A–E yerine gerçek adlar yazılacaktır.
+## 2. Issue Listesi
 
-## 2. Ana Issue Listesi
+| No | Başlık | Sorumlu | Ar-Ge reviewer | Durum |
+|---:|---|---|---|---|
+| #1 | Add immutable task and result models | İbrahim | Cem Bora | ✅ |
+| #2 | Implement safe and unsafe coin states | İbrahim | Tolga | ✅ |
+| #3 | Implement safe and unsafe counters | İbrahim | Cem Bora | ✅ |
+| #4 | Add expected calculation and invariant checks | İbrahim | Tolga | ✅ |
+| #5 | Add core state and metrics unit tests | İbrahim | Cem Bora | ✅ |
+| #6 | Implement seeded task producer | Fırat | Tolga | ✅ |
+| #7 | Implement blocking task queue | Fırat | Cem Bora | ✅ |
+| #8 | Implement fixed worker pool and price workers | Fırat | Tolga | ✅ |
+| #9 | Add completion and graceful shutdown mechanisms | Fırat | Cem Bora | ✅ |
+| #10 | Add benchmark and thread dump evidence | Fırat | Tolga | ✅ altyapı; final gerçek kanıt kontrolü gerekli |
+| #11 | Add API DTOs and exception handling | Ahmet | Cem Bora | ⏳ |
+| #12 | Implement simulation orchestration service | Ahmet | Tolga | ⏳ |
+| #13 | Add simulate, coins and stats endpoints | Ahmet | Cem Bora | ⏳ |
+| #14 | Add Swagger and request validation | Ahmet | Tolga | ⏳ |
+| #15 | Add controller integration tests | Ahmet | Cem Bora | ⏳ |
+| #16 | Integrate all modules | Ortak | Cem Bora + Tolga | ⏳ |
+| #17 | Perform race condition observation runs | Ortak, teknik lider Fırat | Tolga | ⏳ |
+| #18 | Resolve intentional merge conflict | Ortak | Cem Bora | ⏳ |
+| #19 | Complete README and delivery report | Ortak | Cem Bora + Tolga | 🔄 |
+| #20 | Final regression and clean-clone test | Ortak | Cem Bora + Tolga | ⏳ |
 
-| Sıra | Issue başlığı | Owner | Reviewer | Branch | Bağımlılık |
-|---:|---|---|---|---|---|
-| 1 | Bootstrap repository and basic GitHub rules | E | A | `chore/bootstrap-project` | Yok |
-| 2 | Add immutable task and snapshot models | A | B | `feature/task-and-snapshot-models` | #1 |
-| 3 | Implement safe and unsafe coin state | A | B | `feature/coin-state` | #2 |
-| 4 | Implement safe and unsafe processed counters | C | D | `feature/processed-counters` | #1 |
-| 5 | Add deterministic task producer and bounded task queue | B | C | `feature/task-producer-queue` | #2 |
-| 6 | Add price workers and named fixed worker pool | B | C | `feature/worker-pool` | #3, #4, #5 |
-| 7 | Add expected result, stats and invariant calculation | C | D | `feature/metrics-invariant` | #2, #3, #4 |
-| 8 | Implement simulation engine and graceful shutdown | E | A | `feature/simulation-engine` | #6, #7 |
-| 9 | Implement simulation service and concurrency guard | E | A | `feature/simulation-service` | #8 |
-| 10 | Add REST API, validation, error responses and Swagger | D | E | `feature/simulation-api` | #7, #9 |
-| 11 | Add unit and integration tests | A/C/D | B/E | `test/concurrency-and-api` | #3–#10 |
-| 12 | Add benchmark, thread dump and stress evidence | E | D | `test/benchmark-thread-dump` | #8–#11 |
-| 13 | Run and document planned merge conflict | D | E | `docs/merge-conflict-demo` | #1 |
-| 14 | Complete README and TESLIM_RAPORU | Tüm ekip | E | `docs/final-delivery` | #10–#13 |
-
-## 3. Kabul Kriterleri
-
-### Issue 1 — Bootstrap repository and basic GitHub rules
-
-- [ ] Spring Boot Maven projesi Java 21 ile açılıyor.
-- [ ] `application.properties` kullanılıyor; `application.yml` yok.
-- [ ] `.gitignore`, `README.md`, `TESLIM_RAPORU.md`, `docs/ISSUE_PLAN.md` kökte/doğru yerde.
-- [ ] CI `mvn clean verify` çalıştırıyor.
-- [ ] İlk CI sonrasında `main` ruleset aktif.
-- [ ] Collaborator'lar eklendi.
-
-### Issue 2 — Immutable task and snapshot models
-
-- [ ] `PriceUpdateTask` immutable `record`.
-- [ ] Poison pill gerçek görevlerle karışmayacak biçimde tanımlandı.
-- [ ] `CoinSnapshot`, `ExpectedCoinResult`, `CoinComparison`, `SimulationRunResult` immutable.
-- [ ] Mutable state API'ye doğrudan verilmiyor.
-
-### Issue 3 — Safe and unsafe coin state
-
-- [ ] Ortak `CoinState` sözleşmesi tanımlandı.
-- [ ] `UnsafeCoinState` kilit kullanmadan dört alanı güncelliyor.
-- [ ] `SafeCoinState` coin başına `ReentrantLock` kullanıyor.
-- [ ] Lock `finally` içinde bırakılıyor.
-- [ ] Snapshot safe sürümde lock altında oluşturuluyor.
-- [ ] Unit testler mevcut.
-
-### Issue 4 — Safe and unsafe processed counters
-
-- [ ] Ortak `ProcessedCounter` sözleşmesi var.
-- [ ] Unsafe sürüm düz `long` + `count++` kullanıyor.
-- [ ] Safe sürüm `AtomicLong` kullanıyor.
-- [ ] Safe counter concurrency testi geçiyor.
-
-### Issue 5 — Deterministic task producer and task queue
-
-- [ ] Aynı seed + updates aynı görev listesini üretiyor.
-- [ ] Coin seçimi ve delta üretimi dokümante.
-- [ ] Üretilen liste immutable.
-- [ ] `TaskQueue` açık `BlockingQueue` kullanıyor.
-- [ ] Queue tipi ve kapasite kararı README ile uyumlu.
-- [ ] Worker sayısı kadar poison pill eklenebiliyor.
-
-### Issue 6 — Price workers and named pool
-
-- [ ] `PriceWorker` `Runnable`.
-- [ ] Worker `queue.take()` ile busy waiting yapmadan bekliyor.
-- [ ] Gerçek görev tamamlanınca counter ve latch doğru güncelleniyor.
-- [ ] Poison pill worker'ı durduruyor.
-- [ ] Interrupt flag yeniden set ediliyor.
-- [ ] Thread isimleri safe/unsafe mode ve sıra numarasını gösteriyor.
-- [ ] Her görev için `new Thread()` açılmıyor.
-
-### Issue 7 — Expected result, stats and invariant
-
-- [ ] Expected sonuç tek thread ile görev listesinden hesaplanıyor.
-- [ ] Safe/unsafe elapsed time `System.nanoTime()` ile ölçülüyor.
-- [ ] Throughput formülü doğru.
-- [ ] Fiyat ve update count invariant'ları bulunuyor.
-- [ ] Toplam safe processed count kontrol ediliyor.
-- [ ] Her coin için expected/unsafe/safe karşılaştırması üretiliyor.
-
-### Issue 8 — Simulation engine and graceful shutdown
-
-- [ ] `workers` kadar fixed pool oluşturuluyor.
-- [ ] `CountDownLatch` gerçek task sayısıyla oluşturuluyor.
-- [ ] Producer queue'ya tüm görevleri ve poison pill'leri ekliyor.
-- [ ] Engine bütün görevlerin bitmesini bekliyor.
-- [ ] `shutdown + awaitTermination + shutdownNow` uygulanıyor.
-- [ ] Timeout ve interrupt hata akışı yönetiliyor.
-- [ ] Unsafe ve safe state birbirinden bağımsız.
-
-### Issue 9 — Simulation service and concurrency guard
-
-- [ ] Görev listesi yalnız bir kez üretiliyor.
-- [ ] Expected/unsafe/safe aynı listeyi kullanıyor.
-- [ ] `AtomicBoolean.compareAndSet` ile aynı anda yalnız bir simülasyon.
-- [ ] `finally` içinde running flag bırakılıyor.
-- [ ] Son tamamlanan immutable stats `AtomicReference` ile yayımlanıyor.
-- [ ] `/coins` için safe snapshot saklanıyor.
-
-### Issue 10 — API, validation and Swagger
-
-- [ ] `POST /simulate`, `GET /coins`, `GET /stats` çalışıyor.
-- [ ] `updates` 1–100.000, `workers` 1–16 validation.
-- [ ] Hatalı parametre 400.
-- [ ] Sonuç yoksa 404.
-- [ ] İkinci simülasyon 409.
-- [ ] Hata formatı tutarlı.
-- [ ] Swagger'da parametre, başarı/hata cevapları ve örnekler görünür.
-- [ ] Swagger adresi README ile uyumlu.
-
-### Issue 11 — Tests
-
-- [ ] Seed repeatability testi.
-- [ ] Expected calculator testi.
-- [ ] Safe counter concurrency testi.
-- [ ] Safe coin snapshot/invariant testi.
-- [ ] Validation 400 testi.
-- [ ] 404 testi.
-- [ ] 409 concurrency testi.
-- [ ] En az bir controller integration testi.
-- [ ] `mvn clean verify` geçiyor.
-
-### Issue 12 — Benchmark, stress and thread dump
-
-- [ ] Aynı seed/updates ile 1, 2, 4, 8 worker ölçümü.
-- [ ] Safe ve unsafe süre/throughput kaydı.
-- [ ] Benchmark sırasında DEBUG task logları kapalı.
-- [ ] Unsafe race observation birden fazla çalıştırmada raporlandı.
-- [ ] Thread dump alındı.
-- [ ] Worker sayısı/state/queue wait/contention/deadlock yorumlandı.
-- [ ] Çıktılar `docs/benchmark/` ve `docs/thread-dump/` altında.
-
-### Issue 13 — Planned merge conflict
-
-- [ ] İki farklı branch aynı README satırını farklı değiştiriyor.
-- [ ] İlk PR merge ediliyor.
-- [ ] İkinci branch gerçek conflict üretiyor.
-- [ ] Conflict IntelliJ veya terminalde çözülüyor.
-- [ ] Çözüm commit/PR linki kaydediliyor.
-- [ ] README'de öğrenilenler yazılıyor.
-
-### Issue 14 — Final delivery docs
-
-- [ ] README'deki bütün placeholder'lar dolduruldu.
-- [ ] Tasarım kararları gerçek kodla birebir aynı.
-- [ ] Race, invariant, benchmark ve thread dump kanıtları eklendi.
-- [ ] Katkı tablosunda beş üyenin branch/PR/review linki var.
-- [ ] `TESLIM_RAPORU.md` tamamen dolu.
-- [ ] Temiz clone ile çalıştırma doğrulandı.
-
-## 4. Review Rotasyonu
-
-| PR sahibi | Reviewer | Beklenen review odağı |
-|---|---|---|
-| A | B | Mutable state, lock kapsamı, snapshot |
-| B | C | Queue, poison pill, worker lifecycle |
-| C | D | Formül, invariant, DTO'ya yansıyan alanlar |
-| D | E | HTTP durumları, validation, integration |
-| E | A | Engine, shutdown, AtomicBoolean/Reference |
-
-Her üye en az bir **anlamlı review yorumu** yapmalıdır. Sadece “LGTM” yazmak yerine örneğin lock'un `finally` içinde bırakılması, task'ın immutable olması, endpoint'in doğru HTTP durumunu dönmesi gibi somut bir nokta incelenmelidir.
-
-## 5. Branch ve Commit Kuralı
+## 3. Bağımlılık Sırası
 
 ```text
-feature/<kisa-konu>
-test/<kisa-konu>
-docs/<kisa-konu>
-chore/<kisa-konu>
+#1 → #2, #3
+#2 + #3 → #4
+#1–#4 → #5
+
+#1 → #6 → #7
+#2 + #3 + #7 → #8
+#8 → #9
+#9 → #10
+
+#1 + #4 + #9 → #11, #12
+#11 + #12 → #13
+#13 → #14 → #15
+
+#1–#15 → #16
+#16 → #17
+#18 bağımsız olarak kontrollü doküman dosyasında yapılabilir
+#16–#18 → #19
+#19 → #20
 ```
 
-Örnek commitler:
+## 4. Tamamlanan Issue Kabul Özeti
+
+### #1 — Immutable modeller
+
+- `PriceUpdateTask` immutable `record`.
+- Sonuç modelleri mutable state'i dışarı sızdırmaz.
+- Koleksiyonlar gerekiyorsa defensive copy kullanır.
+
+### #2 — Safe ve unsafe coin state
+
+- Unsafe state lock kullanmaz.
+- Safe state coin başına `ReentrantLock` kullanır.
+- `unlock()` `finally` içindedir.
+- İlişkili state alanları aynı kritik bölümde güncellenir.
+
+### #3 — Safe ve unsafe counters
+
+- `Counter` ortak sözleşmesi vardır.
+- Unsafe counter düz `long` ve increment kullanır.
+- Safe counter `AtomicLong` kullanır.
+
+### #4 — Expected ve invariant
+
+- Expected hesap aynı task listesini tek thread ile işler.
+- Fiyat ve update count ayrı kontrol edilir.
+- Safe processed count doğrulanır.
+
+### #5 — Core unit testleri
+
+- Seed dışındaki model/state/counter/metrics davranışları test edilir.
+- Unsafe'in her çalışmada yanlış olmasını bekleyen flaky test yoktur.
+
+### #6 — Seeded task producer
+
+- Aynı seed + updates aynı listeyi üretir.
+- Task listesi immutable döner.
+- Coin, sequence ve delta kuralları test edilir.
+
+### #7 — Blocking task queue
+
+- Açık `BlockingQueue<PriceUpdateTask>` kullanılır.
+- Sınırlı `ArrayBlockingQueue` tercih edilir.
+- `put/take`, FIFO, blocking ve backpressure test edilir.
+- Worker sayısı kadar poison pill desteklenir.
+
+### #8 — Fixed worker pool ve worker
+
+- Her task için thread açılmaz.
+- Fixed thread pool kullanılır.
+- Worker isimleri anlamlıdır.
+- Worker queue'dan `take()` ile görev alır.
+- Interrupt flag korunur.
+
+### #9 — Completion ve graceful shutdown
+
+- Gerçek task sayısı kadar `CountDownLatch`.
+- Poison pill gerçek task sayılmaz.
+- Engine bütün task'ların bitmesini bekler.
+- `shutdown`, `awaitTermination`, `shutdownNow` uygulanır.
+- Timeout ve interrupt akışları yönetilir.
+
+### #10 — Benchmark ve thread dump
+
+- 1/2/4/8 worker ölçüm altyapısı vardır.
+- Task DEBUG logları benchmark sırasında kapalıdır.
+- Thread dump worker isimlerini görünür kılar.
+- Final issue kapatılmadan gerçek çıktı dosyaları kontrol edilir.
+
+## 5. Ahmet'in Issue Kabul Kriterleri
+
+### #11 — API DTO ve exception handling
+
+- Mutable `CoinState` doğrudan response olmaz.
+- DTO'lar immutable tasarlanır.
+- 400, 404, 409, 500 standart hata formatına çevrilir.
+- İç stack trace client'a gönderilmez.
+
+### #12 — Simulation orchestration service
+
+- Task listesi yalnızca bir kez üretilir.
+- Expected, unsafe ve safe aynı listeyi kullanır.
+- `AtomicBoolean.compareAndSet` ile aynı anda tek simülasyon çalışır.
+- Running flag `finally` içinde bırakılır.
+- Son immutable result güvenli yayımlanır.
+- Service HTTP ayrıntılarını bilmez.
+
+### #13 — Endpoint'ler
+
+```http
+POST /simulate
+GET /coins
+GET /stats
+```
+
+- Controller ince kalır.
+- Queue, executor ve lock controller içinde yönetilmez.
+- `/simulate` bütün işler bitince döner.
+
+### #14 — Swagger ve validation
+
+- `updates`: 1–100.000
+- `workers`: 1–16
+- `seed`: opsiyonel
+- Swagger adresi README ve properties ile aynıdır.
+- 400/404/409/500 cevapları dokümante edilir.
+
+### #15 — Controller integration testleri
+
+- Spring context kullanılan gerçek integration test.
+- 200, 400, 404 ve 409 test edilir.
+- 409 testi `Thread.sleep()` varsayımına dayanmaz.
+- Testler sıra bağımsızdır.
+- Testler worker/executor sızıntısı bırakmaz.
+
+## 6. Ortak Issue Kabul Kriterleri
+
+### #16 — Entegrasyon
+
+- Duplicate model veya ikinci mimari oluşturulmaz.
+- `com.infina.price_simulator` package yapısı korunur.
+- Same-task-list kuralı doğrulanır.
+- Tüm modüller `mvn clean verify` ile geçer.
+
+### #17 — Race observation
+
+- Aynı seed ve parametrelerle birden fazla run yapılır.
+- Unsafe sonuç yapay olarak bozulmaz.
+- Bozulan run sayısı ve safe invariant kaydedilir.
+- Gerçek sonuç `docs/evidence/race-observation.md` dosyasına yazılır.
+
+### #18 — Merge conflict
+
+- İki branch aynı dosyanın aynı satırını değiştirir.
+- Gerçek Git conflict oluşur.
+- Manuel çözülür.
+- Commit ve PR linkleri raporlanır.
+- Production kodu risk için kullanılmaz.
+
+### #19 — Doküman
+
+- README gerçek implementasyonla uyumludur.
+- TESLIM_RAPORU gerçek link ve metrikleri içerir.
+- Placeholder'lar final teslimde kalmaz.
+- Çelişkili Swagger, package veya sınıf adı bulunmaz.
+
+### #20 — Final regression
+
+- Temiz clone.
+- `mvn clean verify`.
+- Uygulama açılışı.
+- Swagger ve endpoint doğrulaması.
+- 400/404/409.
+- Safe invariant.
+- Repository hijyeni.
+
+## 7. Branch ve PR Standardı
+
+Önerilen branch formatı:
 
 ```text
-Add immutable price update task
-Add bounded blocking task queue
-Fix coin race with per-coin ReentrantLock
-Add simulation conflict integration test
-Document worker thread dump
+feature/<issue-no>-<short-name>
+test/<issue-no>-<short-name>
+docs/<issue-no>-<short-name>
 ```
 
-## 6. PR Açıklama Standardı
+PR issue'yu Ar-Ge manuel kapatacaksa:
+
+```text
+Refs #<issue-no>
+```
+
+kullanılır. `Closes #...` kullanılması issue'nun merge ile otomatik kapanmasına
+neden olabilir.
+
+PR açıklaması:
 
 ```markdown
-## Yapılan değişiklikler
+## Yapılan Değişiklikler
 - ...
 
-## İlgili issue
-Closes #<NO>
+## İlgili Issue
+Refs #<NO>
 
-## Nasıl test edildi?
-- `mvn test`
-- ...
+## Nasıl Test Edildi?
+- `.\mvnw.cmd clean verify`
 
-## Concurrency etkisi
+## Concurrency / Mimari Etkisi
 - Paylaşılan veri:
-- Kullanılan koruma:
+- Koruma yöntemi:
 - Alternatif ve neden seçilmedi:
 
-## Kontrol listesi
-- [ ] Testler geçiyor
-- [ ] README/Swagger gerekiyorsa güncel
-- [ ] Mutable state dışarı açılmıyor
-- [ ] Review için küçük ve tek amaçlı
+## Kontrol Listesi
+- [ ] Testler başarılı
+- [ ] Mimari sınırlar korundu
+- [ ] README/Swagger etkisi işlendi
+- [ ] Mutable state dışarı açılmadı
 ```
 
-## 7. Planlı Merge Conflict
+## 8. Review Rotasyonu
 
-Önerilen güvenli alan: README'de geçici bir `Takım sloganı` satırı.
+- İbrahim, Fırat'ın en az bir PR'ını inceler.
+- Fırat, Ahmet'in en az bir PR'ını inceler.
+- Ahmet, İbrahim'in en az bir PR'ını inceler.
+- Cem Bora ve Tolga kabul kriteri review'larını yapar.
+- Sadece `LGTM` yerine teknik yorum bırakılır.
 
-- Branch 1: `docs/conflict-a`
-- Branch 2: `docs/conflict-b`
-- Conflict dosyası: `README.md`
-- Çözüm sahibi: D
-- Reviewer: E
+## 9. Ar-Ge Issue Kapatma Akışı
 
-Uygulama kodunda bilinçli conflict oluşturulmayacaktır; teslim riski azaltılır.
+1. İlgili PR linkini kontrol et.
+2. CI sonucunu kontrol et.
+3. Kabul kriterlerini kontrol et.
+4. Test veya evidence dosyasını kontrol et.
+5. Main branch üzerinde smoke test yap.
+6. Gerekirse changes requested ver.
+7. Onay yorumunu yaz.
+8. Issue'yu manuel kapat.
 
-## 8. Bir Haftalık Takvim
+Standart yorum:
 
-| Gün | Hedef |
-|---|---|
-| 1 | Repo/bootstrap, görev dağılımı, model ve interface kararları |
-| 2 | Coin state, counter, task producer ve queue |
-| 3 | Worker pool, engine ve unsafe/safe akış |
-| 4 | Expected/invariant/stats, service ve endpointler |
-| 5 | Validation, Swagger, unit/integration testler |
-| 6 | Benchmark, stres gözlemi, thread dump, merge conflict |
-| 7 | Doküman, clean clone testi, son PR/review ve teslim |
+```markdown
+## Ar-Ge Doğrulaması
 
-## 9. Merge Sırası
+- [ ] PR issue içinde paylaşılmış.
+- [ ] CI başarılı.
+- [ ] Review yorumları çözülmüş.
+- [ ] Kabul kriterleri karşılanmış.
+- [ ] Test/kanıt mevcut.
+- [ ] Mimari sınırlar korunmuş.
+- [ ] Main branch üzerinde doğrulandı.
 
-Çakışmayı azaltmak için önerilen sıra:
+**Karar:** APPROVED / CHANGES REQUESTED
+**Doğrulayan:** @kullanici
+**Not:**
+```
 
-1. Bootstrap
-2. Immutable modeller
-3. Counter + coin state
-4. Producer + queue
-5. Worker pool
-6. Metrics/invariant
-7. Engine
-8. Service
-9. API
-10. Tests
-11. Benchmark/thread dump
-12. Final docs
+## 10. Definition of Done
 
-Ortak interface değişikliği gerektiğinde bağımlı PR'lar rebase edilmeden önce ekip kanalında duyurulmalıdır.
+- Kod derlenir.
+- İlgili testler geçer.
+- `mvn clean verify` başarılıdır.
+- Branch'ten PR açılmıştır.
+- PR issue'ya bağlıdır.
+- Anlamlı review tamamlanmıştır.
+- CI başarılıdır.
+- Gerekli doküman güncellenmiştir.
+- Ar-Ge doğrulaması sonrası issue kapatılmıştır.
