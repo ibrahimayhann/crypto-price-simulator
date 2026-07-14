@@ -17,13 +17,14 @@ import java.util.List;
 @Validated
 public class SimulationController {
 
-    //  Issue #9'u bitirildiğinde buradaki yorum satırlarını kaldırılacak:
 
-    // private final SimulationService simulationService;
-    //
-    // public SimulationController(SimulationService simulationService) {
-    //     this.simulationService = simulationService;
-    // }
+    
+    private final SimulationService simulationService;
+
+
+     public SimulationController(SimulationService simulationService) {
+         this.simulationService = simulationService;
+     }
 
     @PostMapping("/simulate")
     public ResponseEntity<StatsResponse> simulate(
@@ -31,26 +32,19 @@ public class SimulationController {
             @RequestParam @Min(1) @Max(16) int workers,
             @RequestParam(required = false) Long seed) {
 
-        // StatsResponse response = simulationService.runSimulation(updates, workers, seed);
-        // return ResponseEntity.ok(response);
-
-        // Şimdilik hata vermemesi için boş dönüyoruz:
-        return ResponseEntity.ok(null);
+         StatsResponse response = simulationService.runSimulation(updates, workers, seed);
+         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/coins")
     public ResponseEntity<List<CoinResponse>> getCoins() {
-
-        // return ResponseEntity.ok(simulationService.getLatestCoins());
-
-        return ResponseEntity.ok(null);
+        List<CoinResponse> response = simulationService.getCoins();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/stats")
     public ResponseEntity<StatsResponse> getStats() {
-
-        // return ResponseEntity.ok(simulationService.getLatestStats());
-
-        return ResponseEntity.ok(null);
+        StatsResponse response = simulationService.getStats();
+        return ResponseEntity.ok(response);
     }
 }
