@@ -1,8 +1,7 @@
 # Eşzamanlı Kripto Fiyat Simülatörü
 
-Java 21 ve Spring Boot ile geliştirilen bu proje; aynı immutable fiyat güncelleme
-görevlerini unsafe ve thread-safe akışlarda işleyerek race condition, lost update,
-Producer–Consumer, fixed worker pool, `AtomicLong`, `ReentrantLock`,
+Java 21 ve Spring Boot ile geliştirilen bu proje; aynı immutable fiyat güncelleme görevlerini unsafe ve thread-safe
+akışlarda işleyerek race condition, lost update, Producer–Consumer, fixed worker pool, `AtomicLong`, `ReentrantLock`,
 `CountDownLatch`, poison pill ve graceful shutdown davranışlarını gösterir.
 
 > **Güncel durum**
@@ -21,13 +20,13 @@ Producer–Consumer, fixed worker pool, `AtomicLong`, `ReentrantLock`,
 
 Repository'de yalnızca aşağıdaki ana dokümanlar tutulmalıdır:
 
-| Dosya | Amacı |
-|---|---|
-| `README.md` | Projenin ne yaptığını, mevcut mimariyi, çalıştırmayı ve güncel durumu açıklar. |
-| `docs/ISSUE_PLAN.md` | Gerçek `#1–#20` issue dağılımını, bağımlılıkları ve review sürecini tutar. |
+| Dosya                      | Amacı                                                                                   |
+|----------------------------|-----------------------------------------------------------------------------------------|
+| `README.md`                | Projenin ne yaptığını, mevcut mimariyi, çalıştırmayı ve güncel durumu açıklar.          |
+| `docs/ISSUE_PLAN.md`       | Gerçek `#1–#20` issue dağılımını, bağımlılıkları ve review sürecini tutar.              |
 | `docs/AI_PROJECT_GUIDE.md` | Yapay zekâ araçlarının mevcut kod sözleşmelerini bozmadan yönlendirme yapmasını sağlar. |
-| `TESLIM_RAPORU.md` | Final PR, test, benchmark, race condition, thread dump ve ekip kanıtlarını içerir. |
-| `docs/evidence/` | Gerçek benchmark, race observation ve thread dump çıktılarının yeridir. |
+| `TESLIM_RAPORU.md`         | Final PR, test, benchmark, race condition, thread dump ve ekip kanıtlarını içerir.      |
+| `docs/evidence/`           | Gerçek benchmark, race observation ve thread dump çıktılarının yeridir.                 |
 
 Eski veya kopya README dosyaları repository'de tutulmamalıdır.
 
@@ -35,17 +34,16 @@ Eski veya kopya README dosyaları repository'de tutulmamalıdır.
 
 ## 1. Projenin Amacı
 
-Bu proje kapsamlı bir kripto para uygulaması değildir. Domain bilinçli olarak
-sade tutulmuştur. Amaç, Java concurrency araçlarını görünür ve ölçülebilir
-şekilde kullanmaktır.
+Bu proje kapsamlı bir kripto para uygulaması değildir. Domain bilinçli olarak sade tutulmuştur. Amaç, Java concurrency
+araçlarını görünür ve ölçülebilir şekilde kullanmaktır.
 
 Başlangıç coin değerleri:
 
 | Coin | Başlangıç fiyatı |
-|---|---:|
-| BTC | 60.000 |
-| ETH | 3.000 |
-| SOL | 150 |
+|------|-----------------:|
+| BTC  |           60.000 |
+| ETH  |            3.000 |
+| SOL  |              150 |
 
 Görev modeli:
 
@@ -93,7 +91,7 @@ için kullanılmalıdır.
 - JWT / kullanıcı yönetimi
 - Haricî kripto API'si
 
-Projede database olarak MySQL kullanıyoruz.
+Proje in-memory çalışır. CONCFLICT-FIRAT
 
 ---
 
@@ -132,6 +130,7 @@ Mevcut sözleşmeler:
 ```java
 public interface Counter {
     void increment();
+
     long get();
 }
 ```
@@ -196,8 +195,8 @@ service/
 - Delta değerlerini takım kararı olarak `-100..100`, sıfır hariç üretir.
 - Listeyi `List.copyOf()` ile immutable döndürür.
 
-Task listesi yalnızca bir kez üretilmeli ve expected, unsafe ve safe akışlarda
-yeniden kullanılmalıdır. Bu kuralın orchestration tarafındaki garantisi Ahmet'in
+Task listesi yalnızca bir kez üretilmeli ve expected, unsafe ve safe akışlarda yeniden kullanılmalıdır. Bu kuralın
+orchestration tarafındaki garantisi Ahmet'in
 `SimulationService` görevinde tamamlanacaktır.
 
 ### 4.2 BlockingQueue
@@ -211,8 +210,7 @@ Bu seçim:
 - Queue dolduğunda `put()` üzerinden backpressure sağlar.
 - Queue boşken `take()` ile busy waiting yapılmadan beklenmesini sağlar.
 
-`TaskQueue` singleton Spring bean değildir. Her engine run için yeni queue
-oluşturulur.
+`TaskQueue` singleton Spring bean değildir. Her engine run için yeni queue oluşturulur.
 
 ### 4.3 Fixed worker pool
 
@@ -231,8 +229,8 @@ unsafe-worker-1
 unsafe-worker-2
 ```
 
-`PriceWorker` queue'dan task alır, coin state'i günceller, processed counter'ı
-artırır ve completion mekanizmasına haber verir.
+`PriceWorker` queue'dan task alır, coin state'i günceller, processed counter'ı artırır ve completion mekanizmasına haber
+verir.
 
 ### 4.4 Safe ve unsafe state
 
@@ -261,6 +259,7 @@ public void increment() {
 Safe coin state, coin başına `ReentrantLock` kullanır:
 
 ```java
+
 @Override
 public void applyDelta(long delta) {
     lock.lock();
@@ -272,8 +271,7 @@ public void applyDelta(long delta) {
 }
 ```
 
-`currentPrice`, `updateCount`, `lastDelta` ve `lastUpdatedBy` aynı kritik
-bölümde güncellenir.
+`currentPrice`, `updateCount`, `lastDelta` ve `lastUpdatedBy` aynı kritik bölümde güncellenir.
 
 ### 4.5 Completion ve worker sonlandırma
 
@@ -324,32 +322,31 @@ safeProcessedCount
 submittedUpdates
 ```
 
-Unsafe sonucun her çalıştırmada yanlış çıkması beklenmez. Race condition
-zamanlamaya bağlıdır ve yapay biçimde oluşturulmaz.
+Unsafe sonucun her çalıştırmada yanlış çıkması beklenmez. Race condition zamanlamaya bağlıdır ve yapay biçimde
+oluşturulmaz.
 
 ---
 
 ## 6. Tasarım Kararları
 
-| Karar noktası | Seçim | Gerekçe |
-|---|---|---|
-| Task modeli | Java `record` | Immutable görev |
-| Seed | `Random(seed)` | Tekrarlanabilir iş yükü |
-| Task listesi | `List.copyOf()` | Aşamalar arasında değişikliği engellemek |
-| Queue | Sınırlı `ArrayBlockingQueue` | Backpressure ve bellek kontrolü |
-| Worker pool | Fixed thread pool | Thread sayısını sınırlandırmak |
-| Worker isimleri | `safe-worker-N`, `unsafe-worker-N` | Log ve thread dump okunabilirliği |
-| Unsafe counter | `long` + `value++` | Race condition gözlemi |
-| Safe counter | `AtomicLong` | Atomik increment |
-| Safe coin state | Coin başına `ReentrantLock` | Compound state'i tutarlı güncellemek |
-| Completion | `CountDownLatch` | Gerçek task'ların tamamını beklemek |
-| Worker bitişi | Poison pill | Queue'da bekleyen worker'ları sonlandırmak |
-| Shutdown | `shutdown/awaitTermination/shutdownNow` | Timeout ve interrupt kontrollü kapanma |
-| Süre ölçümü | `System.nanoTime()` | Monotonic süre ölçümü |
-| Throughput | Submitted task / elapsed second | Unsafe counter kaybından bağımsız ölçüm |
+| Karar noktası   | Seçim                                   | Gerekçe                                    |
+|-----------------|-----------------------------------------|--------------------------------------------|
+| Task modeli     | Java `record`                           | Immutable görev                            |
+| Seed            | `Random(seed)`                          | Tekrarlanabilir iş yükü                    |
+| Task listesi    | `List.copyOf()`                         | Aşamalar arasında değişikliği engellemek   |
+| Queue           | Sınırlı `ArrayBlockingQueue`            | Backpressure ve bellek kontrolü            |
+| Worker pool     | Fixed thread pool                       | Thread sayısını sınırlandırmak             |
+| Worker isimleri | `safe-worker-N`, `unsafe-worker-N`      | Log ve thread dump okunabilirliği          |
+| Unsafe counter  | `long` + `value++`                      | Race condition gözlemi                     |
+| Safe counter    | `AtomicLong`                            | Atomik increment                           |
+| Safe coin state | Coin başına `ReentrantLock`             | Compound state'i tutarlı güncellemek       |
+| Completion      | `CountDownLatch`                        | Gerçek task'ların tamamını beklemek        |
+| Worker bitişi   | Poison pill                             | Queue'da bekleyen worker'ları sonlandırmak |
+| Shutdown        | `shutdown/awaitTermination/shutdownNow` | Timeout ve interrupt kontrollü kapanma     |
+| Süre ölçümü     | `System.nanoTime()`                     | Monotonic süre ölçümü                      |
+| Throughput      | Submitted task / elapsed second         | Unsafe counter kaybından bağımsız ölçüm    |
 
-Ahmet'in görevleri tamamlandığında aşağıdaki iki karar da bu tabloya
-gerçek implementasyonla eklenecektir:
+Ahmet'in görevleri tamamlandığında aşağıdaki iki karar da bu tabloya gerçek implementasyonla eklenecektir:
 
 - Sonucun güvenli yayımlanması,
 - İkinci eşzamanlı simülasyon isteğinin engellenmesi.
@@ -399,16 +396,14 @@ Zorunlu test kapsamı:
 - Graceful shutdown,
 - Worker thread leak kontrolü.
 
-Unsafe implementasyonun her testte yanlış çıkmasını bekleyen flaky assertion
-yazılmaz.
+Unsafe implementasyonun her testte yanlış çıkmasını bekleyen flaky assertion yazılmaz.
 
 ---
 
 ## 8. Benchmark ve Thread Dump
 
-Fırat'ın `#10` görevi benchmark ve thread dump altyapısını içerir. Final teslimde
-örnek veya uydurma sayı kullanılmamalıdır; gerçek çıktılar aşağıdaki dosyalara
-eklenmelidir:
+Fırat'ın `#10` görevi benchmark ve thread dump altyapısını içerir. Final teslimde örnek veya uydurma sayı
+kullanılmamalıdır; gerçek çıktılar aşağıdaki dosyalara eklenmelidir:
 
 ```text
 docs/evidence/benchmark-results.md
@@ -458,10 +453,8 @@ bulunmalıdır. `application.yml` silinmelidir.
 ```properties
 spring.application.name=price-simulator
 server.port=8080
-
 springdoc.api-docs.path=/api-docs
 springdoc.swagger-ui.path=/swagger-ui.html
-
 logging.level.root=INFO
 logging.level.com.infina.price_simulator=INFO
 logging.level.com.infina.price_simulator.engine.PriceWorker=INFO
@@ -490,8 +483,7 @@ Uygulamayı başlatma:
 .\mvnw.cmd spring-boot:run
 ```
 
-Ahmet'in API görevleri tamamlanmadan uygulama ayağa kalkabilir ancak zorunlu
-endpoint'lerin mevcut olması beklenmez.
+Ahmet'in API görevleri tamamlanmadan uygulama ayağa kalkabilir ancak zorunlu endpoint'lerin mevcut olması beklenmez.
 
 ---
 
@@ -509,35 +501,48 @@ GET /stats
 
 ```json
 {
-  "seed": 42, "submittedUpdates": 500,
-  "unsafeProcessedUpdates": 495, "safeProcessedUpdates": 500,
-  "workers": 4, "unsafeElapsedMs": 3, "safeElapsedMs": 2,
-  "unsafeThroughputPerSec": 149490, "safeThroughputPerSec": 226911,
+  "seed": 42,
+  "submittedUpdates": 500,
+  "unsafeProcessedUpdates": 495,
+  "safeProcessedUpdates": 500,
+  "workers": 4,
+  "unsafeElapsedMs": 3,
+  "safeElapsedMs": 2,
+  "unsafeThroughputPerSec": 149490,
+  "safeThroughputPerSec": 226911,
   "safeInvariantPassed": true,
   "coins": [
-    { "id": "BTC", "initial": 60000, "expected": 59454, "unsafe": 59521, "safe": 59454,
-      "expectedUpdateCount": 168, "unsafeUpdateCount": 167, "safeUpdateCount": 168 }
+    {
+      "id": "BTC",
+      "initial": 60000,
+      "expected": 59454,
+      "unsafe": 59521,
+      "safe": 59454,
+      "expectedUpdateCount": 168,
+      "unsafeUpdateCount": 167,
+      "safeUpdateCount": 168
+    }
   ]
 }
 ```
 
 Validation:
 
-| Parametre | Kural |
-|---|---|
-| `updates` | 1–100.000 |
-| `workers` | 1–16 |
-| `seed` | Opsiyonel — verilmezse `System.nanoTime()` ile üretilir, cevaptaki `seed` alanından okunabilir |
+| Parametre | Kural                                                                                          |
+|-----------|------------------------------------------------------------------------------------------------|
+| `updates` | 1–100.000                                                                                      |
+| `workers` | 1–16                                                                                           |
+| `seed`    | Opsiyonel — verilmezse `System.nanoTime()` ile üretilir, cevaptaki `seed` alanından okunabilir |
 
 HTTP durumları (`GlobalExceptionHandler` ile doğrulandı):
 
-| Durum | HTTP |
-|---|---:|
-| Geçersiz parametre (`@Min`/`@Max` ihlali, `ConstraintViolationException`) | 400 |
-| Eksik parametre (`MissingServletRequestParameterException`) | 400 |
-| Sonuç bulunamadı (`/stats`, `/coins` — henüz simülasyon yok) | 404 |
-| Başka simülasyon çalışıyor (`AtomicBoolean` ile tespit) | 409 |
-| Beklenmeyen hata | 500 |
+| Durum                                                                     | HTTP |
+|---------------------------------------------------------------------------|-----:|
+| Geçersiz parametre (`@Min`/`@Max` ihlali, `ConstraintViolationException`) |  400 |
+| Eksik parametre (`MissingServletRequestParameterException`)               |  400 |
+| Sonuç bulunamadı (`/stats`, `/coins` — henüz simülasyon yok)              |  404 |
+| Başka simülasyon çalışıyor (`AtomicBoolean` ile tespit)                   |  409 |
+| Beklenmeyen hata                                                          |  500 |
 
 Swagger UI:
 
@@ -553,9 +558,8 @@ http://localhost:8080/api-docs
 
 `config/OpenApiConfig.java` API başlığı ve açıklamasını tanımlar. Not:
 `springdoc-openapi-starter-webmvc-ui` önce `2.5.0` idi; Spring Boot `4.1.0`
-(Spring Framework 7) ile `ControllerAdviceBean` reflection uyumsuzluğu
-(`NoSuchMethodError`) verdiği için `3.0.3`'e yükseltildi — bu sürüm
-Spring Boot 4 hattını hedefliyor.
+(Spring Framework 7) ile `ControllerAdviceBean` reflection uyumsuzluğu (`NoSuchMethodError`) verdiği için `3.0.3`'e
+yükseltildi — bu sürüm Spring Boot 4 hattını hedefliyor.
 
 Controller integration testi: `SimulationControllerIntegrationTest`
 (`src/test/.../api/controller`) — 400/200 senaryolarını ve `/simulate` →
@@ -565,27 +569,27 @@ Controller integration testi: `SimulationControllerIntegrationTest`
 
 ## 12. Issue Durumu
 
-| Issue | Sorumlu | Durum |
-|---|---|---|
-| #1–#5 | İbrahim | ✅ Kod ve test geliştirmesi tamamlandı |
-| #6–#10 | Fırat | ✅ Kod ve teknik kanıt altyapısı tamamlandı |
-| #11–#15 | Ahmet | ⏳ Geliştirilecek |
-| #16–#20 | Ortak | ⏳ Final entegrasyon ve teslim |
+| Issue   | Sorumlu | Durum                                       |
+|---------|---------|---------------------------------------------|
+| #1–#5   | İbrahim | ✅ Kod ve test geliştirmesi tamamlandı      |
+| #6–#10  | Fırat   | ✅ Kod ve teknik kanıt altyapısı tamamlandı |
+| #11–#15 | Ahmet   | ⏳ Geliştirilecek                           |
+| #16–#20 | Ortak   | ⏳ Final entegrasyon ve teslim              |
 
-`#10` için gerçek benchmark ve thread dump dosyalarının final kontrolde dolu
-olması gerekir. Altyapının yazılmış olması tek başına final kanıt yerine geçmez.
+`#10` için gerçek benchmark ve thread dump dosyalarının final kontrolde dolu olması gerekir. Altyapının yazılmış olması
+tek başına final kanıt yerine geçmez.
 
 ---
 
 ## 13. Ekip
 
-| Üye | Sorumluluk |
-|---|---|
-| İbrahim | Model, state, counter, expected, invariant ve core testler |
-| Fırat | Producer, queue, worker pool, engine lifecycle ve evidence altyapısı |
-| Ahmet | API DTO, exception, service, endpoint, validation, Swagger ve integration test |
-| Cem Bora | Ar-Ge review, requirements traceability ve README kontrolü |
-| Tolga | Ar-Ge review, teslim raporu ve final doğrulama |
+| Üye      | Sorumluluk                                                                     |
+|----------|--------------------------------------------------------------------------------|
+| İbrahim  | Model, state, counter, expected, invariant ve core testler                     |
+| Fırat    | Producer, queue, worker pool, engine lifecycle ve evidence altyapısı           |
+| Ahmet    | API DTO, exception, service, endpoint, validation, Swagger ve integration test |
+| Cem Bora | Ar-Ge review, requirements traceability ve README kontrolü                     |
+| Tolga    | Ar-Ge review, teslim raporu ve final doğrulama                                 |
 
 PR ve review linkleri `TESLIM_RAPORU.md` dosyasına eklenecektir.
 
@@ -622,6 +626,5 @@ PR ve review linkleri `TESLIM_RAPORU.md` dosyasına eklenecektir.
 
 ## 15. Teslim Öncesi İlke
 
-README bir geliştirme günlüğü değildir. Yalnızca gerçek implementasyonu ve
-doğrulanmış kararları anlatmalıdır. Henüz yazılmamış özellikler “planlanan”
-olarak belirtilmeli; örnek metrikler gerçek sonuç gibi sunulmamalıdır.
+README bir geliştirme günlüğü değildir. Yalnızca gerçek implementasyonu ve doğrulanmış kararları anlatmalıdır. Henüz
+yazılmamış özellikler “planlanan” olarak belirtilmeli; örnek metrikler gerçek sonuç gibi sunulmamalıdır.
