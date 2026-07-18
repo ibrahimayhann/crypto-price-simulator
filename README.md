@@ -1,630 +1,295 @@
-# Eşzamanlı Kripto Fiyat Simülatörü
+# Concurrent Crypto Price Simulator
 
-Java 21 ve Spring Boot ile geliştirilen bu proje; aynı immutable fiyat güncelleme görevlerini unsafe ve thread-safe
-akışlarda işleyerek race condition, lost update, Producer–Consumer, fixed worker pool, `AtomicLong`, `ReentrantLock`,
-`CountDownLatch`, poison pill ve graceful shutdown davranışlarını gösterir.
+A Spring Boot project that processes deterministic cryptocurrency price-update tasks through expected, unsafe, and safe execution paths. The same immutable task list is used in all three paths so concurrency errors can be observed and the safe result can be verified with invariants.
 
-> **Güncel durum**
->
-> - İbrahim'in `#1–#5` görevleri tamamlandı.
-> - Fırat'ın `#6–#10` görevleri tamamlandı.
-> - Ahmet'in `#11–#15` API ve service görevleri geliştirilecek.
-> - `#16–#20` ortak entegrasyon ve teslim görevleri final aşamasında yapılacak.
->
-> Kod geliştirmesi tamamlanan bir issue için gerçek PR, test ve kanıt linkleri
-> teslimden önce `TESLIM_RAPORU.md` dosyasına eklenmelidir.
+The simulator starts with three in-memory coins:
 
----
+| Coin | Initial price |
+|---|---:|
+| BTC | 60,000 |
+| ETH | 3,000 |
+| SOL | 150 |
 
-## Dokümantasyon Haritası
+## Getting Started
 
-Repository'de yalnızca aşağıdaki ana dokümanlar tutulmalıdır:
-
-| Dosya                      | Amacı                                                                                   |
-|----------------------------|-----------------------------------------------------------------------------------------|
-| `README.md`                | Projenin ne yaptığını, mevcut mimariyi, çalıştırmayı ve güncel durumu açıklar.          |
-| `docs/ISSUE_PLAN.md`       | Gerçek `#1–#20` issue dağılımını, bağımlılıkları ve review sürecini tutar.              |
-| `docs/AI_PROJECT_GUIDE.md` | Yapay zekâ araçlarının mevcut kod sözleşmelerini bozmadan yönlendirme yapmasını sağlar. |
-| `TESLIM_RAPORU.md`         | Final PR, test, benchmark, race condition, thread dump ve ekip kanıtlarını içerir.      |
-| `docs/evidence/`           | Gerçek benchmark, race observation ve thread dump çıktılarının yeridir.                 |
-
-Eski veya kopya README dosyaları repository'de tutulmamalıdır.
-
----
-
-## 1. Projenin Amacı
-
-Bu proje kapsamlı bir kripto para uygulaması değildir. Domain bilinçli olarak sade tutulmuştur. Amaç, Java concurrency
-araçlarını görünür ve ölçülebilir şekilde kullanmaktır.
-
-Başlangıç coin değerleri:
-
-| Coin | Başlangıç fiyatı |
-|------|-----------------:|
-| BTC  |           60.000 |
-| ETH  |            3.000 |
-| SOL  |              150 |
-
-Görev modeli:
-
-```java
-package com.infina.price_simulator.model;
-
-public record PriceUpdateTask(
-        long sequence,
-        String coinId,
-        long delta
-) {
-}
-```
-
-Aynı görev listesi:
-
-1. Tek thread ile expected sonucu hesaplamak,
-2. Unsafe simülasyonu çalıştırmak,
-3. Safe simülasyonu çalıştırmak
-
-için kullanılmalıdır.
-
----
-
-## 2. Teknolojiler
+### Requirements
 
 - Java 21
-- Spring Boot
-- Maven / Maven Wrapper
-- Spring Web
-- Spring Validation
-- JUnit 5
-- Spring Boot Test
-- Lombok
-- Swagger / OpenAPI — Ahmet'in `#14` görevi
-- Git / GitHub
+- Maven
 
-### Kapsam dışı
-
-- PostgreSQL
-- Hibernate / JPA
-- Redis
-- Kafka
-- Mikroservis
-- JWT / kullanıcı yönetimi
-- Haricî kripto API'si
-
-Proje in-memory çalışır. CONCFLICT-FIRAT
-
----
-
-## 3. Ana Package ve Mevcut Kod
-
-Ana package:
-
-```text
-com.infina.price_simulator
-```
-
-### İbrahim tarafından tamamlanan sınıflar
-
-```text
-model/
-├── PriceUpdateTask.java
-└── ExpectedValues.java
-
-counter/
-├── Counter.java
-├── SafeCounter.java
-└── UnsafeCounter.java
-
-metrics/
-├── ExpectedCalculator.java
-└── InvariantChecker.java
-
-state/
-├── CoinState.java
-├── SafeCoinState.java
-└── UnsafeCoinState.java
-```
-
-Mevcut sözleşmeler:
-
-```java
-public interface Counter {
-    void increment();
-
-    long get();
-}
-```
-
-```java
-public abstract class CoinState {
-    public abstract void applyDelta(long delta);
-}
-```
-
-`CoinState` alanlarının getter'ları Lombok `@Getter` ile üretilir.
-
-### Fırat tarafından tamamlanan sınıflar
-
-```text
-engine/
-├── TaskProducer.java
-├── TaskQueue.java
-├── SimulationMode.java
-├── PriceWorker.java
-├── SimulationEngine.java
-└── SimulationEngineException.java
-
-util/
-└── WorkerThreadFactory.java
-
-model/
-├── CoinRunSnapshot.java
-└── SimulationRunResult.java
-```
-
-> Repository'deki gerçek sınıf adı bu listeden farklıysa README değil, gerçek kod
-> esas alınır ve doküman aynı PR içinde güncellenir. Aynı sorumluluk için ikinci
-> bir sınıf oluşturulmaz.
-
-### Ahmet tarafından eklenecek alanlar
-
-```text
-api/
-├── controller/
-├── dto/
-└── exception/
-
-config/
-└── OpenApiConfig.java
-
-service/
-└── SimulationService.java
-```
-
----
-
-## 4. Tamamlanan Concurrency Yapısı
-
-### 4.1 Immutable ve seed'li task üretimi
-
-`TaskProducer`:
-
-- Aynı seed ve update sayısı için aynı görev listesini üretir.
-- Yalnızca BTC, ETH ve SOL görevleri oluşturur.
-- Sequence değerlerini 1'den başlatır.
-- Delta değerlerini takım kararı olarak `-100..100`, sıfır hariç üretir.
-- Listeyi `List.copyOf()` ile immutable döndürür.
-
-Task listesi yalnızca bir kez üretilmeli ve expected, unsafe ve safe akışlarda yeniden kullanılmalıdır. Bu kuralın
-orchestration tarafındaki garantisi Ahmet'in
-`SimulationService` görevinde tamamlanacaktır.
-
-### 4.2 BlockingQueue
-
-Producer–Consumer iletişiminde sınırlı kapasiteli `ArrayBlockingQueue` kullanılır.
-
-Bu seçim:
-
-- Kuyruğun kontrolsüz büyümesini engeller.
-- Bellek kullanımını sınırlar.
-- Queue dolduğunda `put()` üzerinden backpressure sağlar.
-- Queue boşken `take()` ile busy waiting yapılmadan beklenmesini sağlar.
-
-`TaskQueue` singleton Spring bean değildir. Her engine run için yeni queue oluşturulur.
-
-### 4.3 Fixed worker pool
-
-Her task için yeni thread açılmaz.
-
-```java
-Executors.newFixedThreadPool(workerCount, workerThreadFactory)
-```
-
-Thread isimleri:
-
-```text
-safe-worker-1
-safe-worker-2
-unsafe-worker-1
-unsafe-worker-2
-```
-
-`PriceWorker` queue'dan task alır, coin state'i günceller, processed counter'ı artırır ve completion mekanizmasına haber
-verir.
-
-### 4.4 Safe ve unsafe state
-
-Unsafe counter:
-
-```java
-private long value;
-
-@Override
-public void increment() {
-    value++;
-}
-```
-
-Safe counter:
-
-```java
-private final AtomicLong value = new AtomicLong();
-
-@Override
-public void increment() {
-    value.incrementAndGet();
-}
-```
-
-Safe coin state, coin başına `ReentrantLock` kullanır:
-
-```java
-
-@Override
-public void applyDelta(long delta) {
-    lock.lock();
-    try {
-        updateState(delta);
-    } finally {
-        lock.unlock();
-    }
-}
-```
-
-`currentPrice`, `updateCount`, `lastDelta` ve `lastUpdatedBy` aynı kritik bölümde güncellenir.
-
-### 4.5 Completion ve worker sonlandırma
-
-- `CountDownLatch` gerçek task sayısıyla oluşturulur.
-- Her gerçek task başarılı veya hatalı tamamlandığında latch bir kez azaltılır.
-- Poison pill latch ve processed count hesabına dahil edilmez.
-- Worker sayısı kadar poison pill gönderilir.
-- Engine, gerçek task'lar tamamlanmadan sonuç döndürmez.
-
-### 4.6 Graceful shutdown
-
-Executor yaşam döngüsü:
-
-1. `shutdown()`
-2. `awaitTermination(...)`
-3. Timeout durumunda `shutdownNow()`
-4. Zorunlu kapatma sonrası yeniden `awaitTermination(...)`
-5. Interrupt durumunda `shutdownNow()`
-6. `Thread.currentThread().interrupt()`
-
-Her run için yeni state, counter, queue, latch ve executor oluşturulur.
-
----
-
-## 5. Expected Sonuç ve Invariant
-
-`ExpectedCalculator`, aynı task listesini tek thread ile işler.
-
-Her coin için:
-
-```text
-safeCurrentPrice
-=
-initialPrice + ilgili coin task'larının delta toplamı
-```
-
-```text
-safeUpdateCount
-=
-ilgili coin için üretilen task sayısı
-```
-
-Genel sayaç için:
-
-```text
-safeProcessedCount
-=
-submittedUpdates
-```
-
-Unsafe sonucun her çalıştırmada yanlış çıkması beklenmez. Race condition zamanlamaya bağlıdır ve yapay biçimde
-oluşturulmaz.
-
----
-
-## 6. Tasarım Kararları
-
-| Karar noktası   | Seçim                                   | Gerekçe                                    |
-|-----------------|-----------------------------------------|--------------------------------------------|
-| Task modeli     | Java `record`                           | Immutable görev                            |
-| Seed            | `Random(seed)`                          | Tekrarlanabilir iş yükü                    |
-| Task listesi    | `List.copyOf()`                         | Aşamalar arasında değişikliği engellemek   |
-| Queue           | Sınırlı `ArrayBlockingQueue`            | Backpressure ve bellek kontrolü            |
-| Worker pool     | Fixed thread pool                       | Thread sayısını sınırlandırmak             |
-| Worker isimleri | `safe-worker-N`, `unsafe-worker-N`      | Log ve thread dump okunabilirliği          |
-| Unsafe counter  | `long` + `value++`                      | Race condition gözlemi                     |
-| Safe counter    | `AtomicLong`                            | Atomik increment                           |
-| Safe coin state | Coin başına `ReentrantLock`             | Compound state'i tutarlı güncellemek       |
-| Completion      | `CountDownLatch`                        | Gerçek task'ların tamamını beklemek        |
-| Worker bitişi   | Poison pill                             | Queue'da bekleyen worker'ları sonlandırmak |
-| Shutdown        | `shutdown/awaitTermination/shutdownNow` | Timeout ve interrupt kontrollü kapanma     |
-| Süre ölçümü     | `System.nanoTime()`                     | Monotonic süre ölçümü                      |
-| Throughput      | Submitted task / elapsed second         | Unsafe counter kaybından bağımsız ölçüm    |
-
-Ahmet'in görevleri tamamlandığında aşağıdaki iki karar da bu tabloya gerçek implementasyonla eklenecektir:
-
-- Sonucun güvenli yayımlanması,
-- İkinci eşzamanlı simülasyon isteğinin engellenmesi.
-
----
-
-## 7. Testler
-
-Tüm testler:
+### Clone and verify
 
 ```powershell
-.\mvnw.cmd test
+git clone https://github.com/ibrahimayhann/crypto-price-simulator.git
+cd crypto-price-simulator
+mvn.cmd clean verify
 ```
 
-Temiz doğrulama:
+### Run the application
 
 ```powershell
-.\mvnw.cmd clean verify
+mvn.cmd spring-boot:run
 ```
 
-Producer ve queue:
+The application starts on `http://localhost:8080`.
+
+## Technology Stack
+
+> !!! TEAM INPUT REQUIRED: Complete the team-owned reasons for using each technology. Do not replace these markers with assumptions.
+
+| Technology | Version or usage | Why the team used it |
+|---|---|---|
+| Java | 21 | !!! |
+| Spring Boot | 4.1.0 | !!! |
+| Maven | Build and dependency management | !!! |
+| Spring Web MVC | REST API | !!! |
+| Bean Validation | Request parameter validation | !!! |
+| Springdoc OpenAPI | 3.0.3 | !!! |
+| JUnit 5 | Unit and integration tests | !!! |
+| Java concurrency APIs | `ExecutorService`, `BlockingQueue`, atomic types, locks | !!! |
+
+## Swagger and OpenAPI
+
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- Configured redirect: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/api-docs`
+
+The Swagger index and OpenAPI JSON endpoints were verified against the running application.
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/simulate` | Runs expected, unsafe, and safe executions and returns their comparison. |
+| `GET` | `/coins` | Returns the safe coin snapshots from the last completed simulation. |
+| `GET` | `/stats` | Returns the statistics from the last completed simulation. |
+
+### Simulation parameters
+
+| Parameter | Required | Constraint | Description |
+|---|---|---|---|
+| `updates` | Yes | `1..100000` | Number of immutable update tasks. |
+| `workers` | Yes | `1..16` | Fixed worker-pool size. |
+| `seed` | No | `long` | Reproduces the same task list. A generated seed is returned when omitted. |
+
+Example:
 
 ```powershell
-.\mvnw.cmd "-Dtest=TaskProducerTest,TaskQueueTest" test
+curl.exe -X POST "http://localhost:8080/simulate?updates=10000&workers=4&seed=42"
 ```
 
-Worker ve engine:
+### HTTP status codes
 
-```powershell
-.\mvnw.cmd "-Dtest=WorkerThreadFactoryTest,PriceWorkerTest,SimulationEngineTest" test
-```
+| Status | Situation |
+|---:|---|
+| `200` | Successful simulation or result lookup. |
+| `400` | Missing or out-of-range request parameter. |
+| `404` | No completed simulation exists for `/coins` or `/stats`. |
+| `409` | Another simulation is already running. |
+| `500` | Unexpected execution error. |
 
-PowerShell'de virgül içeren `-Dtest` argümanı tırnak içinde yazılmalıdır.
-
-Zorunlu test kapsamı:
-
-- Aynı seed → aynı task listesi,
-- Safe counter concurrency,
-- Safe coin state,
-- Expected hesap,
-- Invariant,
-- Queue FIFO ve blocking,
-- Backpressure,
-- Poison pill,
-- Worker isimleri,
-- Completion,
-- Graceful shutdown,
-- Worker thread leak kontrolü.
-
-Unsafe implementasyonun her testte yanlış çıkmasını bekleyen flaky assertion yazılmaz.
-
----
-
-## 8. Benchmark ve Thread Dump
-
-Fırat'ın `#10` görevi benchmark ve thread dump altyapısını içerir. Final teslimde örnek veya uydurma sayı
-kullanılmamalıdır; gerçek çıktılar aşağıdaki dosyalara eklenmelidir:
+## Architecture
 
 ```text
-docs/evidence/benchmark-results.md
-docs/evidence/race-observation.md
-docs/evidence/thread-dump-analysis.md
-docs/evidence/thread-dump.txt
+POST /simulate
+      |
+      v
+SimulationService
+      |
+      +--> TaskProducer --> one immutable PriceUpdateTask list
+      |
+      +--> ExpectedCalculator (single thread)
+      |
+      +--> SimulationEngine (UNSAFE)
+      |
+      +--> SimulationEngine (SAFE)
+      |
+      +--> invariant check --> immutable result snapshots
 ```
 
-Benchmark:
-
-```powershell
-.\mvnw.cmd "-Dbenchmark=true" "-Dtest=SimulationBenchmarkTest" test
-```
-
-Thread dump evidence:
-
-```powershell
-.\mvnw.cmd "-DthreadDumpDemo=true" "-Dtest=ThreadDumpEvidenceTest" test
-```
-
-PID alındıktan sonra:
-
-```powershell
-jcmd <PID> Thread.print > docs\evidence\thread-dump.txt
-```
-
-Karşılaştırılacak worker sayıları:
+Each engine run creates its own coin states, counter, bounded queue, completion latch, and fixed worker pool:
 
 ```text
-1, 2, 4, 8
+Producer --> ArrayBlockingQueue --> fixed PriceWorker pool --> coin state + counter
 ```
 
-Task bazlı DEBUG logları benchmark sırasında kapalı olmalıdır.
+The queue capacity is `min(task count, 1000)`. Workers stop through one poison pill per worker. Completed statistics and safe snapshots are published through `AtomicReference`; an `AtomicBoolean` allows only one active simulation.
 
----
+## Concurrency Concepts
 
-## 9. Uygulama Ayarları
+- A fixed thread pool reuses a bounded number of worker threads instead of creating one thread per task. This limits thread creation, per-thread memory use, scheduling pressure, and context switching.
+- `ArrayBlockingQueue.put()` applies backpressure when the queue is full. `take()` blocks idle workers without busy waiting.
+- The unsafe counter uses a non-atomic read-modify-write increment, so concurrent updates may be lost.
+- A coin update changes `currentPrice`, `updateCount`, `lastDelta`, and `lastUpdatedBy` as one logical operation. Protecting only one field would not make the complete state consistent.
+- `CountDownLatch` waits for all real tasks. Poison pills stop queue consumers, and executor termination is awaited before result snapshots are created.
+- Correctness is checked from the generated task list rather than inferred from timing or log output.
 
-Repository'de yalnızca:
+## Unsafe and Safe Implementations
+
+| Concern | Unsafe path | Safe path |
+|---|---|---|
+| Processed counter | Plain `long` increment | `AtomicLong.incrementAndGet()` |
+| Coin update | Unprotected compound update | Coin-level `ReentrantLock` |
+| Expected result | Not applicable | Calculated sequentially from the same task list |
+| Result validation | May deviate because of races | Checked with price, update-count, and processed-count invariants |
+
+Unsafe output is not expected to fail on every run. Race conditions depend on thread scheduling; the implementation does not modify unsafe results artificially.
+
+## Design Decisions
+
+> !!! TEAM INPUT REQUIRED: Complete only the rationale agreed by the team.
+
+| Decision | Current implementation | Team rationale |
+|---|---|---|
+| Task model | Immutable Java `record` | !!! |
+| Workload reproducibility | `Random(seed)` | !!! |
+| Shared workload | One `List.copyOf()` task list | !!! |
+| Queue | Bounded `ArrayBlockingQueue` | !!! |
+| Queue capacity | `min(task count, 1000)` | !!! |
+| Worker execution | Fixed thread pool | !!! |
+| Safe counter | `AtomicLong` | !!! |
+| Safe coin state | One `ReentrantLock` per coin | !!! |
+| Completion | `CountDownLatch` | !!! |
+| Worker termination | Poison pills | !!! |
+| Executor shutdown | `shutdown`, timed `awaitTermination`, then `shutdownNow` if needed | !!! |
+| Active-run guard | `AtomicBoolean` | !!! |
+| Result publication | `AtomicReference` with immutable snapshots | !!! |
+
+## Correctness Invariants
+
+Expected values are calculated sequentially from the same immutable task list used by both engine modes.
 
 ```text
-src/main/resources/application.properties
+safePrice = initialPrice + sum(all deltas generated for the coin)
+safeUpdateCount = number of tasks generated for the coin
+safeProcessedCount = submittedUpdates
 ```
 
-bulunmalıdır. `application.yml` silinmelidir.
+The simulation reports `safeInvariantPassed=true` only when all three conditions hold.
 
-```properties
-spring.application.name=price-simulator
-server.port=8080
-springdoc.api-docs.path=/api-docs
-springdoc.swagger-ui.path=/swagger-ui.html
-logging.level.root=INFO
-logging.level.com.infina.price_simulator=INFO
-logging.level.com.infina.price_simulator.engine.PriceWorker=INFO
-logging.pattern.console=%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
-```
+## Race Condition Evidence
 
----
+The recorded stress run used seed `42`, `50,000` updates, `4` workers, and `5` runs.
 
-## 10. Çalıştırma
+| Observation | Result |
+|---|---:|
+| Runs with unsafe counter deviation | 5 / 5 |
+| Runs with unsafe coin deviation | 5 / 5 |
+| Runs with successful safe invariant | 5 / 5 |
+| Unsafe result artificially modified | No |
 
-Java sürümü:
+Detailed run data and analysis: [`docs/evidence/race-observation.md`](docs/evidence/race-observation.md)
 
-```powershell
-java -version
-```
+## Performance Results
 
-Test:
+Recorded workload: seed `42`, `50,000` updates, task-level DEBUG logging disabled.
 
-```powershell
-.\mvnw.cmd clean verify
-```
+| Workers | Unsafe ms | Safe ms | Unsafe task/s | Safe task/s | Safe invariant |
+|---:|---:|---:|---:|---:|---|
+| 1 | 37 | 21 | 1,351,351 | 2,380,952 | Passed |
+| 2 | 17 | 15 | 2,941,176 | 3,225,806 | Passed |
+| 4 | 9 | 8 | 5,555,556 | 6,549,252 | Passed |
+| 8 | 11 | 12 | 4,545,455 | 4,094,481 | Passed |
 
-Uygulamayı başlatma:
+> !!! TEAM INPUT REQUIRED: Add the team's interpretation of the worker-count results, including task duration, context switching, and lock contention.
 
-```powershell
-.\mvnw.cmd spring-boot:run
-```
+Full environment and result details: [`docs/evidence/benchmark-results.md`](docs/evidence/benchmark-results.md)
 
-Ahmet'in API görevleri tamamlanmadan uygulama ayağa kalkabilir ancak zorunlu endpoint'lerin mevcut olması beklenmez.
+## ReentrantLock and synchronized
 
----
+| Topic | `ReentrantLock` | `synchronized` | Team comment |
+|---|---|---|---|
+| Lock ownership | Explicit `lock()` / `unlock()` | Intrinsic monitor | !!! |
+| Release discipline | `unlock()` in `finally` | Released automatically when leaving the monitor | !!! |
+| Optional lock APIs | Supports APIs such as `tryLock()` and interruptible acquisition | Uses monitor entry | !!! |
+| Project usage | One lock per `SafeCoinState` | Not used for safe coin updates | !!! |
+| Team selection rationale | | | !!! |
+| Coin-level versus global locking | | | !!! |
 
-## 11. API
+> !!! TEAM INPUT REQUIRED: Complete the comparison and the team's reason for selecting coin-level `ReentrantLock`.
 
-`SimulationController`, gerçek `SimulationService`'e bağlı ve doğrulandı:
+## Thread Dump Analysis
 
-```http
-POST /simulate?updates=500&workers=4&seed=42
-GET /coins
-GET /stats
-```
-
-Örnek `POST /simulate` cevabı (gerçek çalıştırmadan alınmıştır):
-
-```json
-{
-  "seed": 42,
-  "submittedUpdates": 500,
-  "unsafeProcessedUpdates": 495,
-  "safeProcessedUpdates": 500,
-  "workers": 4,
-  "unsafeElapsedMs": 3,
-  "safeElapsedMs": 2,
-  "unsafeThroughputPerSec": 149490,
-  "safeThroughputPerSec": 226911,
-  "safeInvariantPassed": true,
-  "coins": [
-    {
-      "id": "BTC",
-      "initial": 60000,
-      "expected": 59454,
-      "unsafe": 59521,
-      "safe": 59454,
-      "expectedUpdateCount": 168,
-      "unsafeUpdateCount": 167,
-      "safeUpdateCount": 168
-    }
-  ]
-}
-```
-
-Validation:
-
-| Parametre | Kural                                                                                          |
-|-----------|------------------------------------------------------------------------------------------------|
-| `updates` | 1–100.000                                                                                      |
-| `workers` | 1–16                                                                                           |
-| `seed`    | Opsiyonel — verilmezse `System.nanoTime()` ile üretilir, cevaptaki `seed` alanından okunabilir |
-
-HTTP durumları (`GlobalExceptionHandler` ile doğrulandı):
-
-| Durum                                                                     | HTTP |
-|---------------------------------------------------------------------------|-----:|
-| Geçersiz parametre (`@Min`/`@Max` ihlali, `ConstraintViolationException`) |  400 |
-| Eksik parametre (`MissingServletRequestParameterException`)               |  400 |
-| Sonuç bulunamadı (`/stats`, `/coins` — henüz simülasyon yok)              |  404 |
-| Başka simülasyon çalışıyor (`AtomicBoolean` ile tespit)                   |  409 |
-| Beklenmeyen hata                                                          |  500 |
-
-Swagger UI:
+The evidence dump captured four named safe workers while they were waiting for queue work.
 
 ```text
-http://localhost:8080/swagger-ui.html
+"safe-worker-1" ... WAITING (parking)
+    at java.util.concurrent.ArrayBlockingQueue.take(...)
 ```
 
-OpenAPI JSON:
+| Check | Observation |
+|---|---|
+| Requested workers | 4 |
+| Visible safe workers | `safe-worker-1` through `safe-worker-4` |
+| Worker state | 4 / 4 `WAITING (parking)` |
+| Queue wait | `ArrayBlockingQueue.take()` visible for all four workers |
+| `BLOCKED` workers | 0 |
+| Java-level deadlock marker | Not present |
+| Unbounded worker creation | Not observed |
+
+- Raw dump: [`docs/evidence/thread-dump.txt`](docs/evidence/thread-dump.txt)
+- Detailed analysis: [`docs/evidence/thread-dump-analysis.md`](docs/evidence/thread-dump-analysis.md)
+
+## Testing
+
+Run the default verification suite:
+
+```powershell
+mvn.cmd clean verify
+```
+
+Latest verified result on Java 21:
 
 ```text
-http://localhost:8080/api-docs
+Tests run: 53, Failures: 0, Errors: 0, Skipped: 3
+BUILD SUCCESS
 ```
 
-`config/OpenApiConfig.java` API başlığı ve açıklamasını tanımlar. Not:
-`springdoc-openapi-starter-webmvc-ui` önce `2.5.0` idi; Spring Boot `4.1.0`
-(Spring Framework 7) ile `ControllerAdviceBean` reflection uyumsuzluğu (`NoSuchMethodError`) verdiği için `3.0.3`'e
-yükseltildi — bu sürüm Spring Boot 4 hattını hedefliyor.
+The three skipped tests are opt-in evidence harnesses:
 
-Controller integration testi: `SimulationControllerIntegrationTest`
-(`src/test/.../api/controller`) — 400/200 senaryolarını ve `/simulate` →
-`/stats` → `/coins` akışını `MockMvc` ile uçtan uca doğrular.
+```powershell
+mvn.cmd "-DraceObservation=true" "-Dtest=RaceObservationEvidenceTest" test
+mvn.cmd "-Dbenchmark=true" "-Dtest=SimulationBenchmarkTest" test
+mvn.cmd "-DthreadDumpDemo=true" "-Dtest=ThreadDumpEvidenceTest" test
+```
 
----
+The test suite covers deterministic task generation, immutable task lists, queue behavior and backpressure, safe/unsafe counters and states, expected-value calculation, invariants, worker naming, completion, shutdown, validation, and controller integration.
 
-## 12. Issue Durumu
+## !!! Merge Conflict Experience
 
-| Issue   | Sorumlu | Durum                                       |
-|---------|---------|---------------------------------------------|
-| #1–#5   | İbrahim | ✅ Kod ve test geliştirmesi tamamlandı      |
-| #6–#10  | Fırat   | ✅ Kod ve teknik kanıt altyapısı tamamlandı |
-| #11–#15 | Ahmet   | ⏳ Geliştirilecek                           |
-| #16–#20 | Ortak   | ⏳ Final entegrasyon ve teslim              |
+Verified Git history:
 
-`#10` için gerçek benchmark ve thread dump dosyalarının final kontrolde dolu olması gerekir. Altyapının yazılmış olması
-tek başına final kanıt yerine geçmez.
+| Field | Value |
+|---|---|
+| First branch | `conflict/readme-memory-a` |
+| Second branch | `conflict/readme-memory-b` |
+| Conflicting file | `README.md` |
+| First merged PR | [#33](https://github.com/ibrahimayhann/crypto-price-simulator/pull/33) |
+| Conflict-resolution PR | [#32](https://github.com/ibrahimayhann/crypto-price-simulator/pull/32) |
+| Conflict-resolution merge commit | `75f3037` |
+| Resolution tool | !!! |
+| Changes made by each branch | !!! |
+| Content retained after resolution | !!! |
+| Team lessons | !!! |
 
----
+> !!! TEAM INPUT REQUIRED: Complete the unresolved fields using the team's actual conflict-resolution experience.
 
-## 13. Ekip
+## Team Contributions
 
-| Üye      | Sorumluluk                                                                     |
-|----------|--------------------------------------------------------------------------------|
-| İbrahim  | Model, state, counter, expected, invariant ve core testler                     |
-| Fırat    | Producer, queue, worker pool, engine lifecycle ve evidence altyapısı           |
-| Ahmet    | API DTO, exception, service, endpoint, validation, Swagger ve integration test |
-| Cem Bora | Ar-Ge review, requirements traceability ve README kontrolü                     |
-| Tolga    | Ar-Ge review, teslim raporu ve final doğrulama                                 |
+> !!! TEAM INPUT REQUIRED: Each member must verify their area.
 
-PR ve review linkleri `TESLIM_RAPORU.md` dosyasına eklenecektir.
+| Member | Area |
+|---|---|
+| İbrahim | !!! |
+| Fırat | !!! |
+| Ahmet | !!! |
+| Cem Bora | !!! |
+| Tolga | !!! |
 
----
+## !!! Bonus Work
 
-## 14. Kalan Çalışmalar
+> !!! TEAM INPUT REQUIRED: Document completed bonus work and its evidence. If no bonus was completed, replace this block with a clear statement that the submitted version contains no bonus work.
 
-### Ahmet
-
-- [x] API DTO'ları ve exception handler,
-- [x] `SimulationService`,
-- [x] Task listesinin yalnızca bir kez üretilmesi,
-- [x] Expected → unsafe → safe orchestration,
-- [x] `AtomicBoolean` ile 409 kontrolü,
-- [x] Son immutable result'ın güvenli paylaşılması,
-- [x] `/simulate`, `/coins`, `/stats`,
-- [x] Validation (400/404/409 gerçek çalıştırmayla doğrulandı),
-- [x] Swagger/OpenAPI (`OpenApiConfig`, springdoc `3.0.3`'e yükseltildi),
-- [x] Controller integration testleri (`SimulationControllerIntegrationTest`).
-
-### Ortak
-
-- [ ] Modül entegrasyonu,
-- [ ] Gerçek race observation kayıtları,
-- [ ] Gerçek benchmark değerleri,
-- [ ] Thread dump analizi,
-- [ ] Bilinçli merge conflict,
-- [ ] README ve teslim raporu final kontrolü,
-- [ ] PR/review linkleri,
-- [ ] Clean-clone testi,
-- [ ] Final `mvn clean verify`.
-
----
-
-## 15. Teslim Öncesi İlke
-
-README bir geliştirme günlüğü değildir. Yalnızca gerçek implementasyonu ve doğrulanmış kararları anlatmalıdır. Henüz
-yazılmamış özellikler “planlanan” olarak belirtilmeli; örnek metrikler gerçek sonuç gibi sunulmamalıdır.
+- Virtual Threads: !!!
+- CompletableFuture: !!!
+- Deadlock demonstration and lock ordering: !!!
