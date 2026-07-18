@@ -93,7 +93,7 @@ için kullanılmalıdır.
 - JWT / kullanıcı yönetimi
 - Haricî kripto API'si
 
-Proje in-memory çalışır.
+Projede database olarak MySQL kullanıyoruz.
 
 ---
 
