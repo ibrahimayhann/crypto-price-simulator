@@ -495,14 +495,30 @@ endpoint'lerin mevcut olması beklenmez.
 
 ---
 
-## 11. Planlanan API
+## 11. API
 
-Ahmet'in `#11–#15` görevleri:
+`SimulationController`, gerçek `SimulationService`'e bağlı ve doğrulandı:
 
 ```http
-POST /simulate?updates=10000&workers=4&seed=42
+POST /simulate?updates=500&workers=4&seed=42
 GET /coins
 GET /stats
+```
+
+Örnek `POST /simulate` cevabı (gerçek çalıştırmadan alınmıştır):
+
+```json
+{
+  "seed": 42, "submittedUpdates": 500,
+  "unsafeProcessedUpdates": 495, "safeProcessedUpdates": 500,
+  "workers": 4, "unsafeElapsedMs": 3, "safeElapsedMs": 2,
+  "unsafeThroughputPerSec": 149490, "safeThroughputPerSec": 226911,
+  "safeInvariantPassed": true,
+  "coins": [
+    { "id": "BTC", "initial": 60000, "expected": 59454, "unsafe": 59521, "safe": 59454,
+      "expectedUpdateCount": 168, "unsafeUpdateCount": 167, "safeUpdateCount": 168 }
+  ]
+}
 ```
 
 Validation:
@@ -511,18 +527,19 @@ Validation:
 |---|---|
 | `updates` | 1–100.000 |
 | `workers` | 1–16 |
-| `seed` | Opsiyonel |
+| `seed` | Opsiyonel — verilmezse `System.nanoTime()` ile üretilir, cevaptaki `seed` alanından okunabilir |
 
-HTTP durumları:
+HTTP durumları (`GlobalExceptionHandler` ile doğrulandı):
 
 | Durum | HTTP |
 |---|---:|
-| Geçersiz parametre | 400 |
-| Sonuç bulunamadı | 404 |
-| Başka simülasyon çalışıyor | 409 |
+| Geçersiz parametre (`@Min`/`@Max` ihlali, `ConstraintViolationException`) | 400 |
+| Eksik parametre (`MissingServletRequestParameterException`) | 400 |
+| Sonuç bulunamadı (`/stats`, `/coins` — henüz simülasyon yok) | 404 |
+| Başka simülasyon çalışıyor (`AtomicBoolean` ile tespit) | 409 |
 | Beklenmeyen hata | 500 |
 
-Planlanan Swagger:
+Swagger UI:
 
 ```text
 http://localhost:8080/swagger-ui.html
@@ -534,8 +551,15 @@ OpenAPI JSON:
 http://localhost:8080/api-docs
 ```
 
-Bu bölüm API tamamlandığında gerçek JSON örnekleri ve test sonuçlarıyla
-güncellenecektir.
+`config/OpenApiConfig.java` API başlığı ve açıklamasını tanımlar. Not:
+`springdoc-openapi-starter-webmvc-ui` önce `2.5.0` idi; Spring Boot `4.1.0`
+(Spring Framework 7) ile `ControllerAdviceBean` reflection uyumsuzluğu
+(`NoSuchMethodError`) verdiği için `3.0.3`'e yükseltildi — bu sürüm
+Spring Boot 4 hattını hedefliyor.
+
+Controller integration testi: `SimulationControllerIntegrationTest`
+(`src/test/.../api/controller`) — 400/200 senaryolarını ve `/simulate` →
+`/stats` → `/coins` akışını `MockMvc` ile uçtan uca doğrular.
 
 ---
 
@@ -571,16 +595,16 @@ PR ve review linkleri `TESLIM_RAPORU.md` dosyasına eklenecektir.
 
 ### Ahmet
 
-- [ ] API DTO'ları ve exception handler,
-- [ ] `SimulationService`,
-- [ ] Task listesinin yalnızca bir kez üretilmesi,
-- [ ] Expected → unsafe → safe orchestration,
-- [ ] `AtomicBoolean` ile 409 kontrolü,
-- [ ] Son immutable result'ın güvenli paylaşılması,
-- [ ] `/simulate`, `/coins`, `/stats`,
-- [ ] Validation,
-- [ ] Swagger/OpenAPI,
-- [ ] Controller integration testleri.
+- [x] API DTO'ları ve exception handler,
+- [x] `SimulationService`,
+- [x] Task listesinin yalnızca bir kez üretilmesi,
+- [x] Expected → unsafe → safe orchestration,
+- [x] `AtomicBoolean` ile 409 kontrolü,
+- [x] Son immutable result'ın güvenli paylaşılması,
+- [x] `/simulate`, `/coins`, `/stats`,
+- [x] Validation (400/404/409 gerçek çalıştırmayla doğrulandı),
+- [x] Swagger/OpenAPI (`OpenApiConfig`, springdoc `3.0.3`'e yükseltildi),
+- [x] Controller integration testleri (`SimulationControllerIntegrationTest`).
 
 ### Ortak
 
