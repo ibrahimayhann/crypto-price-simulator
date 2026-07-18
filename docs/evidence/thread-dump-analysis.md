@@ -1,7 +1,7 @@
 # Thread Dump Analizi
 
-- Tarih: `2026-07-14`
-- Dump komutu: `jcmd 14404 Thread.print > docs\evidence\thread-dump.txt`
+- Tarih: `2026-07-18`
+- Dump komutu: `jcmd 42140 Thread.print > docs\evidence\thread-dump.txt`
 - Worker parametresi: `4 (safe-worker)`
 - Ham dosya: `thread-dump.txt`
 
