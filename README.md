@@ -569,7 +569,7 @@ Controller integration testi: `SimulationControllerIntegrationTest`
 |---|---|---|
 | #1–#5 | İbrahim | ✅ Kod ve test geliştirmesi tamamlandı |
 | #6–#10 | Fırat | ✅ Kod ve teknik kanıt altyapısı tamamlandı |
-| #11–#15 | Ahmet | ⏳ Geliştirilecek |
+| #11–#15 | Ahmet | ✅ Kod, validation ve integration test tamamlandı |
 | #16–#20 | Ortak | ⏳ Final entegrasyon ve teslim |
 
 `#10` için gerçek benchmark ve thread dump dosyalarının final kontrolde dolu
