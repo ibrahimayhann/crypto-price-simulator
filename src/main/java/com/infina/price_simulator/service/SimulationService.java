@@ -6,7 +6,9 @@ import com.infina.price_simulator.engine.TaskProducer;
 import com.infina.price_simulator.exceptions.SimulationAlreadyRunningException;
 import com.infina.price_simulator.exceptions.SimulationNotFoundException;
 import com.infina.price_simulator.metrics.ExpectedCalculator;
+import com.infina.price_simulator.model.CoinCatalog;
 import com.infina.price_simulator.model.CoinComparison;
+import com.infina.price_simulator.model.CoinDefinition;
 import com.infina.price_simulator.model.CoinRunSnapshot;
 import com.infina.price_simulator.model.ExpectedValues;
 import com.infina.price_simulator.model.PriceUpdateTask;
@@ -30,13 +32,6 @@ import java.util.concurrent.atomic.AtomicReference;
 @Service
 public class SimulationService {
 
-    // TODO: Engine ile ortak bir CoinCatalog'a taşınmalı (bilgi çiftlenmesi)
-    private static final List<CoinDefinition> COIN_DEFINITIONS = List.of(
-            new CoinDefinition("BTC", 60_000L),
-            new CoinDefinition("ETH", 3_000L),
-            new CoinDefinition("SOL", 150L)
-    );
-
     private final SimulationEngine engine;
     private final TaskProducer taskProducer;
 
@@ -50,8 +45,6 @@ public class SimulationService {
     }
 
     public SimulationStats runSimulation(int updates, int workers, long seed) {
-        // Aynı anda tek simülasyon: kontrol try'dan ÖNCE, yoksa finally
-        // çalışan simülasyonun flag'ini yanlışlıkla söndürür.
         if (!running.compareAndSet(false, true)) {
             throw new SimulationAlreadyRunningException(
                     "A simulation is already running."
@@ -117,9 +110,9 @@ public class SimulationService {
      * fiyatlarını taşıyan kullan-at state nesneleri oluşturulur.
      */
     private List<CoinState> createCoinStates() {
-        List<CoinState> states = new ArrayList<>(COIN_DEFINITIONS.size());
+        List<CoinState> states = new ArrayList<>(CoinCatalog.DEFINITIONS.size());
 
-        for (CoinDefinition definition : COIN_DEFINITIONS) {
+        for (CoinDefinition definition : CoinCatalog.DEFINITIONS) {
             states.add(new UnsafeCoinState(definition.id(), definition.initialPrice()));
         }
 
@@ -208,8 +201,5 @@ public class SimulationService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Coin not found in result: " + id
                 ));
-    }
-
-    private record CoinDefinition(String id, long initialPrice) {
     }
 }

@@ -3,6 +3,8 @@ package com.infina.price_simulator.engine;
 import com.infina.price_simulator.counter.Counter;
 import com.infina.price_simulator.counter.SafeCounter;
 import com.infina.price_simulator.counter.UnsafeCounter;
+import com.infina.price_simulator.model.CoinCatalog;
+import com.infina.price_simulator.model.CoinDefinition;
 import com.infina.price_simulator.model.CoinRunSnapshot;
 import com.infina.price_simulator.model.PriceUpdateTask;
 import com.infina.price_simulator.model.SimulationRunResult;
@@ -92,6 +94,7 @@ public class SimulationEngine {
                     workerCount,
                     taskQueue,
                     coinStates,
+
                     processedCounter,
                     completionLatch,
                     firstFailure
@@ -201,20 +204,12 @@ public class SimulationEngine {
         Map<String, CoinState> states =
                 new LinkedHashMap<>();
 
-        states.put(
-                "BTC",
-                createCoinState(mode, "BTC", 60_000L)
-        );
-
-        states.put(
-                "ETH",
-                createCoinState(mode, "ETH", 3_000L)
-        );
-
-        states.put(
-                "SOL",
-                createCoinState(mode, "SOL", 150L)
-        );
+        for (CoinDefinition definition : CoinCatalog.DEFINITIONS) {
+            states.put(
+                    definition.id(),
+                    createCoinState(mode, definition.id(), definition.initialPrice())
+            );
+        }
 
         /*
          * The map structure is read-only after worker submission. Individual
