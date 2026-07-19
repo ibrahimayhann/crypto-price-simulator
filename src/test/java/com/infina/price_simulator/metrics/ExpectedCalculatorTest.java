@@ -36,4 +36,23 @@ class ExpectedCalculatorTest {
         assertEquals(250, expected.get("ETH").expectedPrice());
         assertEquals(1, expected.get("ETH").expectedUpdateCount());
     }
+
+    @Test
+    void shouldClampExpectedPriceToZero() {
+
+        List<CoinState> coins = List.of(
+                new SafeCoinState("SOL", 150)
+        );
+
+        List<PriceUpdateTask> tasks = List.of(
+                new PriceUpdateTask(1, "SOL", -200),
+                new PriceUpdateTask(2, "SOL", 25)
+        );
+
+        Map<String, ExpectedValues> expected =
+                ExpectedCalculator.calculate(coins, tasks);
+
+        assertEquals(25, expected.get("SOL").expectedPrice());
+        assertEquals(2, expected.get("SOL").expectedUpdateCount());
+    }
 }

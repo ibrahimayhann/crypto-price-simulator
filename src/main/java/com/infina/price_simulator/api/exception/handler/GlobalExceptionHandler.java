@@ -1,8 +1,8 @@
-package com.infina.price_simulator.api.exception;
+package com.infina.price_simulator.api.exception.handler;
 
 import com.infina.price_simulator.api.dto.ErrorResponse;
-import com.infina.price_simulator.exceptions.SimulationAlreadyRunningException;
-import com.infina.price_simulator.exceptions.SimulationNotFoundException;
+import com.infina.price_simulator.api.exception.SimulationAlreadyRunningException;
+import com.infina.price_simulator.api.exception.SimulationNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;

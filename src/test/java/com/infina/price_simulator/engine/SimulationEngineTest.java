@@ -178,7 +178,7 @@ class SimulationEngineTest {
             expectedPrices.computeIfPresent(
                     task.coinId(),
                     (coinId, price) ->
-                            price + task.delta()
+                            Math.max(0, price + task.delta())
             );
 
             expectedCounts.computeIfPresent(

@@ -39,7 +39,7 @@ public final class ExpectedCalculator {
             expected.computeIfPresent(
                     task.coinId(),
                     (key, values) -> new ExpectedValues(
-                            values.expectedPrice() + task.delta(),
+                            Math.max(0, values.expectedPrice() + task.delta()),
                             values.expectedUpdateCount() + 1
                     )
             );

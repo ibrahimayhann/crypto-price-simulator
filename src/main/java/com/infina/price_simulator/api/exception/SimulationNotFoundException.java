@@ -1,4 +1,4 @@
-package com.infina.price_simulator.exceptions;
+package com.infina.price_simulator.api.exception;
 
 public class SimulationNotFoundException extends RuntimeException {
 

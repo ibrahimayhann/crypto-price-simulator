@@ -48,6 +48,22 @@ class SafeCoinStateTest {
         );
     }
 
+    @Test
+    void shouldNotAllowNegativePrice() {
+
+        SafeCoinState coin = new SafeCoinState("SOL", 150);
+
+        coin.applyDelta(-200);
+
+        assertEquals(0, coin.getCurrentPrice());
+        assertEquals(1, coin.getUpdateCount());
+        assertEquals(-200, coin.getLastDelta());
+        assertEquals(
+                Thread.currentThread().getName(),
+                coin.getLastUpdatedBy()
+        );
+    }
+
     /**
      * 8 thread aynı anda SafeCoinState.applyDelta(1) çağırır.
      * ReentrantLock koruması sayesinde:
