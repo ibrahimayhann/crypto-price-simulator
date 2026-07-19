@@ -42,8 +42,7 @@ class ShutdownBehaviorTest {
      * WAITING durumuna geçmesini bekler (BlockingQueue.take() üzerinde bloke).
      * Thread.sleep() yerine deterministik thread-state polling kullanılır.
      */
-    private static void awaitWorkersWaiting(String namePrefix, int expectedCount, long timeoutMs)
-            throws InterruptedException {
+    private static void awaitWorkersWaiting(String namePrefix, int expectedCount, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
             long waitingCount = Thread.getAllStackTraces().keySet().stream()

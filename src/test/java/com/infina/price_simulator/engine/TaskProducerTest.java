@@ -93,11 +93,11 @@ class TaskProducerTest {
         List<PriceUpdateTask> tasks =
                 taskProducer.generate(10, 42L);
 
+        PriceUpdateTask newTask = new PriceUpdateTask(11L, "BTC", 10L);
+
         assertThrows(
                 UnsupportedOperationException.class,
-                () -> tasks.add(
-                        new PriceUpdateTask(11L, "BTC", 10L)
-                )
+                () -> tasks.add(newTask)
         );
     }
 

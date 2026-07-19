@@ -96,8 +96,9 @@ class ThreadDumpEvidenceTest {
          * This sleep belongs only to the manual evidence harness. It is not
          * used as a synchronization mechanism in production or unit tests.
          */
-        TimeUnit.SECONDS.sleep(
-                CAPTURE_WINDOW_SECONDS
+        new CountDownLatch(1).await(
+                CAPTURE_WINDOW_SECONDS,
+                TimeUnit.SECONDS
         );
 
         taskQueue.putPoisonPills(WORKER_COUNT);
@@ -189,8 +190,9 @@ class ThreadDumpEvidenceTest {
          * This sleep belongs only to the manual evidence harness. It is not
          * used as a synchronization mechanism in production or unit tests.
          */
-        TimeUnit.SECONDS.sleep(
-                CAPTURE_WINDOW_SECONDS
+        new CountDownLatch(1).await(
+                CAPTURE_WINDOW_SECONDS,
+                TimeUnit.SECONDS
         );
 
         taskQueue.putPoisonPills(WORKER_COUNT);

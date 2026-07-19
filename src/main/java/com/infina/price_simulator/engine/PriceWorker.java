@@ -3,8 +3,7 @@ package com.infina.price_simulator.engine;
 import com.infina.price_simulator.counter.Counter;
 import com.infina.price_simulator.model.PriceUpdateTask;
 import com.infina.price_simulator.state.CoinState;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 import java.util.Map;
 import java.util.Objects;
@@ -21,8 +20,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class PriceWorker implements Runnable {
 
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(PriceWorker.class);
 
     private final TaskQueue taskQueue;
     private final Map<String, CoinState> coinStatesById;

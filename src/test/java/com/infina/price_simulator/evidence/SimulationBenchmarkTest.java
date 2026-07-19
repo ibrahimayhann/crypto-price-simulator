@@ -116,6 +116,7 @@ class SimulationBenchmarkTest {
         SimulationRunResult virtualIoResult = simulationEngine.run(ioTasks, workerCount, SimulationMode.SAFE, true, true);
         System.out.printf("| Virtual Threads | %d | %,.0f |%n", virtualIoResult.elapsedMillis(), virtualIoResult.throughputPerSecond());
         System.out.println();
+        org.junit.jupiter.api.Assertions.assertNotNull(virtualIoResult);
     }
 
     private void assertSafeInvariant(

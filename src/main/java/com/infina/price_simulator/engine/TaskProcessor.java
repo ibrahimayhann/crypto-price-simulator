@@ -32,13 +32,8 @@ public final class TaskProcessor {
             boolean simulateIoWait
     ) {
         try {
-            if (simulateIoWait) {
-                try {
-                    Thread.sleep(1);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+            if (simulateIoWait && !doIoWait()) {
+                return;
             }
 
             CoinState coinState = coinStatesById.get(task.coinId());
@@ -79,6 +74,16 @@ public final class TaskProcessor {
              * bu metoda hiçbir zaman ulaşmaz.
              */
             completionLatch.countDown();
+        }
+    }
+
+    private static boolean doIoWait() {
+        try {
+            Thread.sleep(1);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
         }
     }
 }

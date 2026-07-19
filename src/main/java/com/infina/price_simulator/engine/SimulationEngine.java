@@ -115,15 +115,18 @@ public class SimulationEngine {
                     ));
                 }
             } else {
-                startWorkers(
-                        executor,
-                        workerCount,
+                WorkerContext context = new WorkerContext(
                         taskQueue,
                         coinStates,
                         processedCounter,
                         completionLatch,
                         firstFailure,
                         simulateIoWait
+                );
+                startWorkers(
+                        executor,
+                        workerCount,
+                        context
                 );
 
                 enqueueTasks(taskQueue, tasks);
@@ -193,25 +196,29 @@ public class SimulationEngine {
         }
     }
 
-    private void startWorkers(
-            ExecutorService executor,
-            int workerCount,
+    private record WorkerContext(
             TaskQueue taskQueue,
             Map<String, CoinState> coinStates,
             Counter processedCounter,
             CountDownLatch completionLatch,
             AtomicReference<Throwable> firstFailure,
             boolean simulateIoWait
+    ) {}
+
+    private void startWorkers(
+            ExecutorService executor,
+            int workerCount,
+            WorkerContext context
     ) {
         for (int index = 0; index < workerCount; index++) {
             executor.submit(
                     new PriceWorker(
-                            taskQueue,
-                            coinStates,
-                            processedCounter,
-                            completionLatch,
-                            firstFailure,
-                            simulateIoWait
+                            context.taskQueue(),
+                            context.coinStates(),
+                            context.processedCounter(),
+                            context.completionLatch(),
+                            context.firstFailure(),
+                            context.simulateIoWait()
                     )
             );
         }

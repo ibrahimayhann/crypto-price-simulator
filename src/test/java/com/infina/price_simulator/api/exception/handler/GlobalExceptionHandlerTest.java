@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -44,6 +43,7 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/test/missing-param")
         void missingParam(@RequestParam int updates) {
+            // Do nothing, just for testing missing param exception
         }
 
         @GetMapping("/test/constraint-violation")
@@ -61,6 +61,7 @@ class GlobalExceptionHandlerTest {
 
         @PostMapping("/test/method-argument-not-valid")
         void methodArgumentNotValid(@Valid @RequestBody TestRequestBody body) {
+            // Do nothing, just for testing argument not valid exception
         }
     }
 
