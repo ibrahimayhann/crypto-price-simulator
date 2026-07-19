@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 /**
@@ -45,9 +46,23 @@ public class TaskProducer {
         Random random = new Random(seed);
         List<PriceUpdateTask> tasks = new ArrayList<>(updateCount);
 
+        Map<String, Long> negativeCapacity = new java.util.HashMap<>();
+        for (com.infina.price_simulator.model.CoinDefinition def : com.infina.price_simulator.model.CoinCatalog.DEFINITIONS) {
+            negativeCapacity.put(def.id(), def.initialPrice());
+        }
+
         for (long sequence = 1; sequence <= updateCount; sequence++) {
             String coinId = selectCoin(random);
             long delta = generateNonZeroDelta(random);
+
+            if (delta < 0) {
+                long capacity = negativeCapacity.get(coinId);
+                if (Math.abs(delta) > capacity) {
+                    delta = Math.abs(delta);
+                } else {
+                    negativeCapacity.put(coinId, capacity - Math.abs(delta));
+                }
+            }
 
             tasks.add(new PriceUpdateTask(sequence, coinId, delta));
         }

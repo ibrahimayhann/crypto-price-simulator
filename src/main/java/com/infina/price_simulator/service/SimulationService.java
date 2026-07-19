@@ -1,10 +1,10 @@
 package com.infina.price_simulator.service;
 
+import com.infina.price_simulator.api.exception.SimulationAlreadyRunningException;
+import com.infina.price_simulator.api.exception.SimulationNotFoundException;
 import com.infina.price_simulator.engine.SimulationEngine;
 import com.infina.price_simulator.engine.SimulationMode;
 import com.infina.price_simulator.engine.TaskProducer;
-import com.infina.price_simulator.exceptions.SimulationAlreadyRunningException;
-import com.infina.price_simulator.exceptions.SimulationNotFoundException;
 import com.infina.price_simulator.metrics.ExpectedCalculator;
 import com.infina.price_simulator.model.CoinCatalog;
 import com.infina.price_simulator.model.CoinComparison;
@@ -16,20 +16,18 @@ import com.infina.price_simulator.model.SimulationRunResult;
 import com.infina.price_simulator.model.SimulationStats;
 import com.infina.price_simulator.state.CoinState;
 import com.infina.price_simulator.state.UnsafeCoinState;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Simülasyon akışını yönetir: görev üretimi, expected hesabı,
- * unsafe ve safe çalıştırmalar, invariant kontrolü ve sonuç yayımlama.
- * Aynı anda yalnızca bir simülasyonun çalışmasına izin verir.
- */
 @Service
+@RequiredArgsConstructor
 public class SimulationService {
 
     private final SimulationEngine engine;
@@ -39,11 +37,6 @@ public class SimulationService {
     private final AtomicReference<SimulationStats> lastStats = new AtomicReference<>();
     private final AtomicReference<List<CoinRunSnapshot>> lastSafeCoins = new AtomicReference<>();
 
-    public SimulationService(SimulationEngine engine, TaskProducer taskProducer) {
-        this.engine = engine;
-        this.taskProducer = taskProducer;
-    }
-
     public SimulationStats runSimulation(int updates, int workers, long seed) {
         if (!running.compareAndSet(false, true)) {
             throw new SimulationAlreadyRunningException(
@@ -52,28 +45,13 @@ public class SimulationService {
         }
 
         try {
-            // Görev listesi yalnızca BİR kez üretilir; üç akış da aynı listeyi kullanır
-            List<PriceUpdateTask> tasks = taskProducer.generate(updates, seed);
+            SimulationExecution execution =
+                    executeSimulation(updates, workers, seed);
 
-            Map<String, ExpectedValues> expected =
-                    ExpectedCalculator.calculate(createCoinStates(), tasks);
+            SimulationStats stats =
+                    buildStats(updates, workers, seed, execution);
 
-            SimulationRunResult unsafeResult =
-                    engine.run(tasks, workers, SimulationMode.UNSAFE);
-
-            SimulationRunResult safeResult =
-                    engine.run(tasks, workers, SimulationMode.SAFE);
-
-            boolean invariantPassed =
-                    checkSafeInvariant(safeResult, expected, tasks.size());
-
-            SimulationStats stats = buildStats(
-                    updates, workers, seed,
-                    expected, unsafeResult, safeResult, invariantPassed
-            );
-
-            lastStats.set(stats);
-            lastSafeCoins.set(safeResult.coins());
+            publishResult(stats, execution.safeResult());
 
             return stats;
         } finally {
@@ -105,79 +83,42 @@ public class SimulationService {
         return coins;
     }
 
-    /*
-     * ExpectedCalculator, CoinState listesi beklediği için başlangıç
-     * fiyatlarını taşıyan kullan-at state nesneleri oluşturulur.
-     */
-    private List<CoinState> createCoinStates() {
-        List<CoinState> states = new ArrayList<>(CoinCatalog.DEFINITIONS.size());
-
-        for (CoinDefinition definition : CoinCatalog.DEFINITIONS) {
-            states.add(new UnsafeCoinState(definition.id(), definition.initialPrice()));
-        }
-
-        return states;
-    }
-
-    /*
-     * InvariantChecker CoinState beklediği ve engine snapshot döndürdüğü için
-     * safe invariant kontrolü snapshot'lar üzerinden burada yapılır.
-     */
-    private boolean checkSafeInvariant(
-            SimulationRunResult safeResult,
-            Map<String, ExpectedValues> expected,
-            int submittedUpdates
+    private SimulationExecution executeSimulation(
+            int updates,
+            int workers,
+            long seed
     ) {
-        if (safeResult.processedUpdates() != submittedUpdates) {
-            return false;
-        }
+        List<PriceUpdateTask> tasks =
+                taskProducer.generate(updates, seed);
 
-        for (CoinRunSnapshot coin : safeResult.coins()) {
-            ExpectedValues values = expected.get(coin.id());
+        Map<String, ExpectedValues> expectedValues =
+                calculateExpectedValues(tasks);
 
-            if (values == null) {
-                return false;
-            }
+        SimulationRunResult unsafeResult =
+                runEngine(tasks, workers, SimulationMode.UNSAFE);
 
-            if (values.expectedPrice() != coin.currentPrice()) {
-                return false;
-            }
+        SimulationRunResult safeResult =
+                runEngine(tasks, workers, SimulationMode.SAFE);
 
-            if (values.expectedUpdateCount() != coin.updateCount()) {
-                return false;
-            }
-        }
+        boolean safeInvariantPassed =
+                isSafeInvariantPassed(safeResult, expectedValues, tasks.size());
 
-        return true;
+        return new SimulationExecution(
+                expectedValues,
+                unsafeResult,
+                safeResult,
+                safeInvariantPassed
+        );
     }
 
     private SimulationStats buildStats(
             int updates,
             int workers,
             long seed,
-            Map<String, ExpectedValues> expected,
-            SimulationRunResult unsafeResult,
-            SimulationRunResult safeResult,
-            boolean invariantPassed
+            SimulationExecution execution
     ) {
-        List<CoinComparison> comparisons = new ArrayList<>();
-
-        for (CoinRunSnapshot safeCoin : safeResult.coins()) {
-            String id = safeCoin.id();
-            ExpectedValues expectedValues = expected.get(id);
-            CoinRunSnapshot unsafeCoin = findCoin(unsafeResult, id);
-
-            comparisons.add(new CoinComparison(
-                    id,
-                    safeCoin.initialPrice(),
-                    expectedValues.expectedPrice(),
-                    unsafeCoin.currentPrice(),
-                    safeCoin.currentPrice(),
-                    expectedValues.expectedUpdateCount(),
-                    unsafeCoin.updateCount(),
-                    safeCoin.updateCount()
-            ));
-        }
+        SimulationRunResult unsafeResult = execution.unsafeResult();
+        SimulationRunResult safeResult = execution.safeResult();
 
         return new SimulationStats(
                 updates,
@@ -189,17 +130,167 @@ public class SimulationService {
                 safeResult.throughputPerSecond(),
                 unsafeResult.processedUpdates(),
                 safeResult.processedUpdates(),
-                comparisons,
-                invariantPassed
+                buildCoinComparisons(execution),
+                execution.safeInvariantPassed()
         );
     }
 
-    private CoinRunSnapshot findCoin(SimulationRunResult result, String id) {
-        return result.coins().stream()
-                .filter(coin -> coin.id().equals(id))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "Coin not found in result: " + id
-                ));
+    private Map<String, ExpectedValues> calculateExpectedValues(
+            List<PriceUpdateTask> tasks
+    ) {
+        return ExpectedCalculator.calculate(createInitialCoinStates(), tasks);
+    }
+
+    private List<CoinState> createInitialCoinStates() {
+        List<CoinState> states =
+                new ArrayList<>(CoinCatalog.DEFINITIONS.size());
+
+        for (CoinDefinition definition : CoinCatalog.DEFINITIONS) {
+            states.add(new UnsafeCoinState(
+                    definition.id(),
+                    definition.initialPrice()
+            ));
+        }
+
+        return states;
+    }
+
+    private SimulationRunResult runEngine(
+            List<PriceUpdateTask> tasks,
+            int workers,
+            SimulationMode mode
+    ) {
+        return engine.run(tasks, workers, mode);
+    }
+
+    private boolean isSafeInvariantPassed(
+            SimulationRunResult safeResult,
+            Map<String, ExpectedValues> expectedValues,
+            int submittedUpdates
+    ) {
+        return safeResult.processedUpdates() == submittedUpdates
+                && matchesExpectedValues(safeResult.coins(), expectedValues);
+    }
+
+    private boolean matchesExpectedValues(
+            List<CoinRunSnapshot> coins,
+            Map<String, ExpectedValues> expectedValues
+    ) {
+        for (CoinRunSnapshot coin : coins) {
+            ExpectedValues expected = expectedValues.get(coin.id());
+
+            if (expected == null) {
+                return false;
+            }
+
+            if (expected.expectedPrice() != coin.currentPrice()) {
+                return false;
+            }
+
+            if (expected.expectedUpdateCount() != coin.updateCount()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private List<CoinComparison> buildCoinComparisons(
+            SimulationExecution execution
+    ) {
+        List<CoinRunSnapshot> safeCoins =
+                execution.safeResult().coins();
+
+        Map<String, CoinRunSnapshot> unsafeCoinsById =
+                indexCoinsById(execution.unsafeResult().coins());
+
+        List<CoinComparison> comparisons =
+                new ArrayList<>(safeCoins.size());
+
+        for (CoinRunSnapshot safeCoin : safeCoins) {
+            comparisons.add(toCoinComparison(
+                    safeCoin,
+                    findCoin(unsafeCoinsById, safeCoin.id()),
+                    findExpectedValues(execution.expectedValues(), safeCoin.id())
+            ));
+        }
+
+        return comparisons;
+    }
+
+    private CoinComparison toCoinComparison(
+            CoinRunSnapshot safeCoin,
+            CoinRunSnapshot unsafeCoin,
+            ExpectedValues expectedValues
+    ) {
+        return new CoinComparison(
+                safeCoin.id(),
+                safeCoin.initialPrice(),
+                expectedValues.expectedPrice(),
+                unsafeCoin.currentPrice(),
+                safeCoin.currentPrice(),
+                expectedValues.expectedUpdateCount(),
+                unsafeCoin.updateCount(),
+                safeCoin.updateCount()
+        );
+    }
+
+    private Map<String, CoinRunSnapshot> indexCoinsById(
+            List<CoinRunSnapshot> coins
+    ) {
+        Map<String, CoinRunSnapshot> indexedCoins =
+                new LinkedHashMap<>();
+
+        for (CoinRunSnapshot coin : coins) {
+            indexedCoins.put(coin.id(), coin);
+        }
+
+        return indexedCoins;
+    }
+
+    private CoinRunSnapshot findCoin(
+            Map<String, CoinRunSnapshot> coinsById,
+            String id
+    ) {
+        CoinRunSnapshot coin = coinsById.get(id);
+
+        if (coin == null) {
+            throw new IllegalStateException(
+                    "Coin not found in result: " + id
+            );
+        }
+
+        return coin;
+    }
+
+    private ExpectedValues findExpectedValues(
+            Map<String, ExpectedValues> expectedValuesById,
+            String id
+    ) {
+        ExpectedValues expectedValues = expectedValuesById.get(id);
+
+        if (expectedValues == null) {
+            throw new IllegalStateException(
+                    "Expected values not found for coin: " + id
+            );
+        }
+
+        return expectedValues;
+    }
+
+    private void publishResult(
+            SimulationStats stats,
+            SimulationRunResult safeResult
+    ) {
+        lastStats.set(stats);
+        lastSafeCoins.set(safeResult.coins());
+    }
+
+    private record SimulationExecution(
+            Map<String, ExpectedValues> expectedValues,
+            SimulationRunResult unsafeResult,
+            SimulationRunResult safeResult,
+            boolean safeInvariantPassed
+    ) {
     }
 }

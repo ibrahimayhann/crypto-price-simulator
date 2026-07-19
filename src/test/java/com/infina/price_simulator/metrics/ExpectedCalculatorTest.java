@@ -35,5 +35,6 @@ class ExpectedCalculatorTest {
 
         assertEquals(250, expected.get("ETH").expectedPrice());
         assertEquals(1, expected.get("ETH").expectedUpdateCount());
+
     }
 }
