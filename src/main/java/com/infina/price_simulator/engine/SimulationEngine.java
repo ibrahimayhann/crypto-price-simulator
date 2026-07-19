@@ -240,10 +240,7 @@ public class SimulationEngine {
             );
         }
 
-        /*
-         * The map structure is read-only after worker submission. Individual
-         * CoinState instances provide safe or unsafe update behavior.
-         */
+
         return Collections.unmodifiableMap(states);
     }
 

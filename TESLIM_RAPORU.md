@@ -167,6 +167,23 @@ Proje geniş bir JUnit ve entegrasyon test ağıyla örülmüştür. Testleri ko
 - Controller integration testi (SimulationControllerIntegrationTest)
 - Graceful Shutdown testi (SimulationEngineTest)
 
+## 8. Zorunlu Özellikler — Öz Değerlendirme
+
+- [X] /simulate, /coins, /stats çalışıyor
+- [X] Geçersiz parametre → HTTP 400, ikinci eşzamanlı istek → HTTP 409
+- [X] Aynı görev listesi (immutable, tek üretim) safe ve unsafe'de kullanılıyor
+- [X] BlockingQueue + sabit thread pool (her görev için yeni thread yok)
+- [X] Güvensiz sürüm hatayı gösteriyor; güvenli sürüm invariant'ı sağlıyor
+- [X] En az bir yerde ReentrantLock kullanıldı
+- [X] Graceful shutdown; işlerin bitmesi bekleniyor
+- [X] Seed ile tekrarlanabilir görev üretimi
+- [X] throughput/süre + 1/2/4/8 worker tablosu
+- [X] Thread dump alındı ve README'de yorumlandı
+- [X] Swagger çalışıyor, adres README'de
+- [X] Unit + en az 1 integration test
+- [X] En az 3 branch, 2 PR, 2 review, 1 çözülmüş conflict
+
+
 ## Grup Üyeleri ve Katkıları
 
 | Üye | Sorumluluk | Branch | Pull Request | Review |
