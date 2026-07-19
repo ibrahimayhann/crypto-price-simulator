@@ -3,17 +3,23 @@ package com.infina.price_simulator.api.exception.handler;
 import com.infina.price_simulator.api.exception.SimulationAlreadyRunningException;
 import com.infina.price_simulator.api.exception.SimulationNotFoundException;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Set;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,6 +54,13 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/generic")
         void generic() {
             throw new IllegalStateException("db connection string leaked: jdbc://internal-secret");
+        }
+
+        record TestRequestBody(@NotBlank String name) {
+        }
+
+        @PostMapping("/test/method-argument-not-valid")
+        void methodArgumentNotValid(@Valid @RequestBody TestRequestBody body) {
         }
     }
 
@@ -89,6 +102,17 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.error").value("Bad Request"));
+    }
+
+    @Test
+    void methodArgumentNotValidReturns400BadRequest() throws Exception {
+        mockMvc.perform(post("/test/method-argument-not-valid")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
