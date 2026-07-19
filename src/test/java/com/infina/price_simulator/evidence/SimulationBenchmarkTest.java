@@ -88,7 +88,7 @@ class SimulationBenchmarkTest {
                         SEED
                 );
 
-        int workerCount = 4; // Optimal for platform threads on most typical dev machines
+        int workerCount = 4; 
 
         System.out.println();
         System.out.println("--- BONUS A: VIRTUAL THREADS (CPU-Bound) ---");
@@ -106,7 +106,7 @@ class SimulationBenchmarkTest {
         System.out.println("| Mode | Elapsed ms | Throughput/s |");
         System.out.println("|---|---:|---:|");
 
-        // Scale down updates for I/O test so it doesn't run forever
+        
         int ioUpdateCount = 1_000;
         List<PriceUpdateTask> ioTasks = taskProducer.generate(ioUpdateCount, SEED);
 
