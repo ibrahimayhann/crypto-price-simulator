@@ -185,6 +185,7 @@ Bonus akışı queue ve poison pill kullanmaz. Platform thread ve Virtual Thread
 | Aktif simülasyon kontrolü | `AtomicBoolean` | `compareAndSet` ile aynı anda ikinci simülasyonu reddederek HTTP 409 üretilmesini sağlar. |
 | Sonuç yayını | Immutable snapshot’larla `AtomicReference` | Tamamlanmış sonucu mutable engine state’ini REST katmanına açmadan güvenli biçimde yayımlar. |
 | Bonus çalıştırma | Görev başına bir Virtual Thread | CPU-bound ve bekleme içeren iş yüklerini fixed platform thread havuzuyla karşılaştırmayı sağlar. |
+| Fiyat Alt Sınırı | `Math.max(0, currentPrice + delta)` | Kripto para fiyatlarının sıfırın altına (negatif değerlere) düşerek mantıksız durumlar oluşturmasını engeller. |
 
 ## Race Condition Gözlemi
 

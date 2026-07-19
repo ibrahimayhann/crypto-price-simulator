@@ -23,7 +23,7 @@ public abstract class CoinState {
     }
 
     protected void updateState(long delta) {
-        currentPrice = Math.max(0, currentPrice + delta);
+        currentPrice += delta;
         updateCount++;
         lastDelta = delta;
         lastUpdatedBy = Thread.currentThread().getName();
