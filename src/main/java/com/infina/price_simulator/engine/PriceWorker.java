@@ -29,6 +29,7 @@ public final class PriceWorker implements Runnable {
     private final Counter processedCounter;
     private final CountDownLatch completionLatch;
     private final AtomicReference<Throwable> firstFailure;
+    private final boolean simulateIoWait;
 
     public PriceWorker(
             TaskQueue taskQueue,
@@ -36,6 +37,17 @@ public final class PriceWorker implements Runnable {
             Counter processedCounter,
             CountDownLatch completionLatch,
             AtomicReference<Throwable> firstFailure
+    ) {
+        this(taskQueue, coinStatesById, processedCounter, completionLatch, firstFailure, false);
+    }
+
+    public PriceWorker(
+            TaskQueue taskQueue,
+            Map<String, CoinState> coinStatesById,
+            Counter processedCounter,
+            CountDownLatch completionLatch,
+            AtomicReference<Throwable> firstFailure,
+            boolean simulateIoWait
     ) {
         this.taskQueue = Objects.requireNonNull(
                 taskQueue,
@@ -61,6 +73,8 @@ public final class PriceWorker implements Runnable {
                 firstFailure,
                 "Failure holder must not be null."
         );
+
+        this.simulateIoWait = simulateIoWait;
     }
 
     @Override
@@ -90,60 +104,13 @@ public final class PriceWorker implements Runnable {
     }
 
     private void processTaskSafely(PriceUpdateTask task) {
-        try {
-            CoinState coinState = findCoinState(task.coinId());
-
-            coinState.applyDelta(task.delta());
-            processedCounter.increment();
-
-
-            /*
-             * Her görev için yapılan loglama yalnızca DEBUG seviyesindedir.
-             * Aksi hâlde konsol çıktısı benchmark sonuçlarını büyük ölçüde etkiler.
-             */
-
-            LOGGER.debug(
-                    "[{}] {} delta={} sequence={}",
-                    Thread.currentThread().getName(),
-                    task.coinId(),
-                    task.delta(),
-                    task.sequence()
-            );
-        } catch (RuntimeException exception) {
-
-            /*
-             * Yalnızca ilk hatayı kaydet. İşçi iş parçacığı görevleri tüketmeye devam eder;
-             * böylece latch sayacı kalıcı olarak sıfırın üzerinde kalmaz.
-             */
-
-            firstFailure.compareAndSet(null, exception);
-
-            LOGGER.error(
-                    "Worker {} failed while processing task sequence={}",
-                    Thread.currentThread().getName(),
-                    task.sequence(),
-                    exception
-            );
-        } finally {
-
-            /*
-             * Başarısız olanlar da dâhil olmak üzere her gerçek görev, latch sayacını
-             * tam olarak bir kez azaltmalıdır. Sonlandırma işaretleri (poison pill)
-             * bu metoda hiçbir zaman ulaşmaz.
-             */
-            completionLatch.countDown();
-        }
-    }
-
-    private CoinState findCoinState(String coinId) {
-        CoinState coinState = coinStatesById.get(coinId);
-
-        if (coinState == null) {
-            throw new IllegalArgumentException(
-                    "Unsupported coin id: " + coinId
-            );
-        }
-
-        return coinState;
+        TaskProcessor.process(
+                task,
+                coinStatesById,
+                processedCounter,
+                completionLatch,
+                firstFailure,
+                simulateIoWait
+        );
     }
 }

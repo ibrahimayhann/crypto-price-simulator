@@ -80,6 +80,44 @@ class SimulationBenchmarkTest {
         System.out.println();
     }
 
+    @Test
+    void compareVirtualThreadsBonus() {
+        List<PriceUpdateTask> tasks =
+                taskProducer.generate(
+                        UPDATE_COUNT,
+                        SEED
+                );
+
+        int workerCount = 4; // Optimal for platform threads on most typical dev machines
+
+        System.out.println();
+        System.out.println("--- BONUS A: VIRTUAL THREADS (CPU-Bound) ---");
+        System.out.println("| Mode | Elapsed ms | Throughput/s |");
+        System.out.println("|---|---:|---:|");
+
+        SimulationRunResult platformResult = simulationEngine.run(tasks, workerCount, SimulationMode.SAFE, false, false);
+        System.out.printf("| Platform (Fixed-4) | %d | %,.0f |%n", platformResult.elapsedMillis(), platformResult.throughputPerSecond());
+
+        SimulationRunResult virtualResult = simulationEngine.run(tasks, workerCount, SimulationMode.SAFE, true, false);
+        System.out.printf("| Virtual Threads | %d | %,.0f |%n", virtualResult.elapsedMillis(), virtualResult.throughputPerSecond());
+        System.out.println();
+
+        System.out.println("--- BONUS A: VIRTUAL THREADS (I/O-Bound, 1ms sleep per task) ---");
+        System.out.println("| Mode | Elapsed ms | Throughput/s |");
+        System.out.println("|---|---:|---:|");
+
+        // Scale down updates for I/O test so it doesn't run forever
+        int ioUpdateCount = 1_000;
+        List<PriceUpdateTask> ioTasks = taskProducer.generate(ioUpdateCount, SEED);
+
+        SimulationRunResult platformIoResult = simulationEngine.run(ioTasks, workerCount, SimulationMode.SAFE, false, true);
+        System.out.printf("| Platform (Fixed-4) | %d | %,.0f |%n", platformIoResult.elapsedMillis(), platformIoResult.throughputPerSecond());
+
+        SimulationRunResult virtualIoResult = simulationEngine.run(ioTasks, workerCount, SimulationMode.SAFE, true, true);
+        System.out.printf("| Virtual Threads | %d | %,.0f |%n", virtualIoResult.elapsedMillis(), virtualIoResult.throughputPerSecond());
+        System.out.println();
+    }
+
     private void assertSafeInvariant(
             List<PriceUpdateTask> tasks,
             List<CoinRunSnapshot> snapshots

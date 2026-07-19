@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -54,6 +55,16 @@ public class SimulationEngine {
             int workerCount,
             SimulationMode mode
     ) {
+        return run(sourceTasks, workerCount, mode, false, false);
+    }
+
+    public SimulationRunResult run(
+            List<PriceUpdateTask> sourceTasks,
+            int workerCount,
+            SimulationMode mode,
+            boolean useVirtualThreads,
+            boolean simulateIoWait
+    ) {
         List<PriceUpdateTask> tasks =
                 validateAndCopyTasks(sourceTasks);
 
@@ -78,30 +89,46 @@ public class SimulationEngine {
         AtomicReference<Throwable> firstFailure =
                 new AtomicReference<>();
 
-        ExecutorService executor =
-                Executors.newFixedThreadPool(
-                        workerCount,
-                        new WorkerThreadFactory(
-                                mode.getThreadNamePrefix()
-                        )
-                );
+        ExecutorService executor;
+        if (useVirtualThreads) {
+            ThreadFactory factory = Thread.ofVirtual().name(mode.getThreadNamePrefix() + "vt-", 1).factory();
+            executor = Executors.newThreadPerTaskExecutor(factory);
+        } else {
+            executor = Executors.newFixedThreadPool(
+                    workerCount,
+                    new WorkerThreadFactory(mode.getThreadNamePrefix())
+            );
+        }
 
         long startedAt = System.nanoTime();
 
         try {
-            startWorkers(
-                    executor,
-                    workerCount,
-                    taskQueue,
-                    coinStates,
+            if (useVirtualThreads) {
+                for (PriceUpdateTask task : tasks) {
+                    executor.submit(() -> TaskProcessor.process(
+                            task,
+                            coinStates,
+                            processedCounter,
+                            completionLatch,
+                            firstFailure,
+                            simulateIoWait
+                    ));
+                }
+            } else {
+                startWorkers(
+                        executor,
+                        workerCount,
+                        taskQueue,
+                        coinStates,
+                        processedCounter,
+                        completionLatch,
+                        firstFailure,
+                        simulateIoWait
+                );
 
-                    processedCounter,
-                    completionLatch,
-                    firstFailure
-            );
-
-            enqueueTasks(taskQueue, tasks);
-            taskQueue.putPoisonPills(workerCount);
+                enqueueTasks(taskQueue, tasks);
+                taskQueue.putPoisonPills(workerCount);
+            }
 
             boolean completed = completionLatch.await(
                     TASK_COMPLETION_TIMEOUT_SECONDS,
@@ -173,7 +200,8 @@ public class SimulationEngine {
             Map<String, CoinState> coinStates,
             Counter processedCounter,
             CountDownLatch completionLatch,
-            AtomicReference<Throwable> firstFailure
+            AtomicReference<Throwable> firstFailure,
+            boolean simulateIoWait
     ) {
         for (int index = 0; index < workerCount; index++) {
             executor.submit(
@@ -182,7 +210,8 @@ public class SimulationEngine {
                             coinStates,
                             processedCounter,
                             completionLatch,
-                            firstFailure
+                            firstFailure,
+                            simulateIoWait
                     )
             );
         }
