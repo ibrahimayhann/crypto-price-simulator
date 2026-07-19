@@ -1,10 +1,12 @@
 package com.infina.price_simulator.evidence;
 
 import com.infina.price_simulator.counter.SafeCounter;
+import com.infina.price_simulator.counter.UnsafeCounter;
 import com.infina.price_simulator.engine.PriceWorker;
 import com.infina.price_simulator.engine.TaskQueue;
 import com.infina.price_simulator.state.CoinState;
 import com.infina.price_simulator.state.SafeCoinState;
+import com.infina.price_simulator.state.UnsafeCoinState;
 import com.infina.price_simulator.util.WorkerThreadFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -108,6 +110,99 @@ class ThreadDumpEvidenceTest {
                         TimeUnit.SECONDS
                 ),
                 "Evidence workers did not terminate."
+        );
+    }
+
+    /**
+     * Unsafe-worker thread'lerini dump edilebilir biçimde çalıştırır.
+     *
+     * <p>ThreadDumpEvidenceTest yalnızca safe-worker içerdiğinden bu test
+     * eksikti. Hem safe-worker hem de unsafe-worker thread adlarının dump'ta
+     * görünmesi, iki modun da thread düzeyinde izlenebileceğini kanıtlar.</p>
+     *
+     * <p>Çalıştırmak için: {@code mvnw test -DthreadDumpDemo=true}</p>
+     */
+    @Test
+    void exposeUnsafeWorkersForThreadDump()
+            throws Exception {
+
+        TaskQueue taskQueue = new TaskQueue(16);
+
+        Map<String, CoinState> coinStates = Map.of(
+                "BTC", new UnsafeCoinState("BTC", 60_000L),
+                "ETH", new UnsafeCoinState("ETH", 3_000L),
+                "SOL", new UnsafeCoinState("SOL", 150L)
+        );
+
+        CountDownLatch completionLatch =
+                new CountDownLatch(0);
+
+        AtomicReference<Throwable> firstFailure =
+                new AtomicReference<>();
+
+        ExecutorService executor =
+                Executors.newFixedThreadPool(
+                        WORKER_COUNT,
+                        new WorkerThreadFactory(
+                                "unsafe-worker-"
+                        )
+                );
+
+        for (int index = 0; index < WORKER_COUNT; index++) {
+            executor.submit(
+                    new PriceWorker(
+                            taskQueue,
+                            coinStates,
+                            new UnsafeCounter(),
+                            completionLatch,
+                            firstFailure
+                    )
+            );
+        }
+
+        long processId =
+                ProcessHandle.current().pid();
+
+        System.out.println();
+        System.out.println(
+                "[UNSAFE] Thread dump evidence JVM PID: "
+                        + processId
+        );
+
+        System.out.println(
+                "Unsafe workers will wait on BlockingQueue.take() for "
+                        + CAPTURE_WINDOW_SECONDS
+                        + " seconds."
+        );
+
+        System.out.println(
+                "Run in another terminal:"
+        );
+
+        System.out.println(
+                "jcmd "
+                        + processId
+                        + " Thread.print > docs\\evidence\\thread-dump-unsafe.txt"
+        );
+
+        /*
+         * This sleep belongs only to the manual evidence harness. It is not
+         * used as a synchronization mechanism in production or unit tests.
+         */
+        TimeUnit.SECONDS.sleep(
+                CAPTURE_WINDOW_SECONDS
+        );
+
+        taskQueue.putPoisonPills(WORKER_COUNT);
+
+        executor.shutdown();
+
+        assertTrue(
+                executor.awaitTermination(
+                        5,
+                        TimeUnit.SECONDS
+                ),
+                "Unsafe evidence workers did not terminate."
         );
     }
 }
