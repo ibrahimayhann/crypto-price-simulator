@@ -141,6 +141,26 @@ public class SimulationController {
                                             """
                             )
                     )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Sunucu İçi Hata — Beklenmeyen bir durum oluştu",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Sunucu Hatası",
+                                    value = """
+                                            {
+                                              "timestamp": "2024-01-15T10:30:00",
+                                              "status": 500,
+                                              "error": "Internal Server Error",
+                                              "message": "An unexpected error occurred: ...",
+                                              "path": "/simulate"
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     @PostMapping("/simulate")
@@ -242,6 +262,26 @@ public class SimulationController {
                                             """
                             )
                     )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Sunucu İçi Hata — Beklenmeyen bir durum oluştu",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Sunucu Hatası",
+                                    value = """
+                                            {
+                                              "timestamp": "2024-01-15T10:30:00",
+                                              "status": 500,
+                                              "error": "Internal Server Error",
+                                              "message": "An unexpected error occurred: ...",
+                                              "path": "/coins"
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     @GetMapping("/coins")
@@ -301,6 +341,26 @@ public class SimulationController {
                                               "status": 404,
                                               "error": "Not Found",
                                               "message": "No completed simulation result found.",
+                                              "path": "/stats"
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Sunucu İçi Hata — Beklenmeyen bir durum oluştu",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Sunucu Hatası",
+                                    value = """
+                                            {
+                                              "timestamp": "2024-01-15T10:30:00",
+                                              "status": 500,
+                                              "error": "Internal Server Error",
+                                              "message": "An unexpected error occurred: ...",
                                               "path": "/stats"
                                             }
                                             """

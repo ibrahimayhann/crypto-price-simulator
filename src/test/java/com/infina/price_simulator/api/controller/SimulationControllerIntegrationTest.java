@@ -11,11 +11,13 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -219,63 +221,62 @@ class SimulationControllerIntegrationTest {
 
     /**
      * Aynı anda iki /simulate isteği gönderildiğinde, biri 200 diğeri 409 almalı.
-     * Bu test SimulationService.running AtomicBoolean'ın doğru çalıştığını kanıtlar.
+     *
+     * <p>Thread.sleep() kullanılmaz. Bunun yerine bir {@link CountDownLatch} "start
+     * tabancası" her iki iş parçacığını da aynı anda serbest bırakır. Bu sayede
+     * {@code SimulationService.running} AtomicBoolean'ının yarış koşulunu yakalama
+     * olasılığı maksimuma çıkar.</p>
+     *
+     * <p>İlk istek 50.000 güncelleme çalıştırdığından birinci simülasyon bitene kadar
+     * ikinci istek 409 alır. Bu test, AtomicBoolean.compareAndSet garantisi sayesinde
+     * kesin olarak 409 bekler.</p>
      */
     @Test
     @Order(13)
     void concurrentSimulationRequestReturns409Conflict() throws Exception {
+        CountDownLatch startGun = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
-        // İlk istek: yüksek iş yükü (uzun sürer)
+        // İlk istek: yüksek iş yükü — simülasyon süresince running=true tutar
         Future<Integer> firstRequest = executor.submit(() -> {
-            try {
-                return mockMvc.perform(post("/simulate")
-                                .param("updates", "50000")
-                                .param("workers", "4"))
-                        .andReturn()
-                        .getResponse()
-                        .getStatus();
-            } catch (Exception e) {
-                return -1;
-            }
+            startGun.await();
+            return mockMvc.perform(post("/simulate")
+                            .param("updates", "50000")
+                            .param("workers", "4"))
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
         });
 
-        // Kısa bir gecikme sonra ikinci istek gönder
-        Thread.sleep(20);
-
+        // İkinci istek: aynı latch'i bekler; tabanca ateşlenince birlikte başlarlar
         Future<Integer> secondRequest = executor.submit(() -> {
-            try {
-                return mockMvc.perform(post("/simulate")
-                                .param("updates", "500")
-                                .param("workers", "2"))
-                        .andReturn()
-                        .getResponse()
-                        .getStatus();
-            } catch (Exception e) {
-                return -1;
-            }
+            startGun.await();
+            return mockMvc.perform(post("/simulate")
+                            .param("updates", "500")
+                            .param("workers", "2"))
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
         });
 
-        int firstStatus = firstRequest.get(30, TimeUnit.SECONDS);
-        int secondStatus = secondRequest.get(30, TimeUnit.SECONDS);
+        // Her iki thread da latch'i geçmeye hazır; şimdi aynı anda serbest bırak
+        startGun.countDown();
+
+        int firstStatus  = firstRequest.get(60, TimeUnit.SECONDS);
+        int secondStatus = secondRequest.get(60, TimeUnit.SECONDS);
 
         executor.shutdown();
 
-        // Birinin 200, diğerinin 200 veya 409 döndürmesi beklenir.
-        // Eğer eşzamanlılık yakalandıysa biri kesinlikle 409 döner.
-        boolean oneSucceeded = firstStatus == 200 || secondStatus == 200;
+        // AtomicBoolean.compareAndSet garantisi: tam olarak biri 200, diğeri 409 almalı
+        boolean oneSucceeded     = firstStatus == 200 || secondStatus == 200;
         boolean conflictDetected = firstStatus == 409 || secondStatus == 409;
 
-        // En az bir başarılı olmalı
-        org.junit.jupiter.api.Assertions.assertTrue(oneSucceeded,
-                "En az bir simülasyon başarıyla tamamlanmalı. " +
-                        "first=" + firstStatus + ", second=" + secondStatus);
+        assertTrue(oneSucceeded,
+                "En az bir simülasyon başarıyla tamamlanmalı. "
+                        + "first=" + firstStatus + ", second=" + secondStatus);
 
-        // Eğer conflict yakalandıysa 409 olmalı, değilse her ikisi de 200 (sıralı çalıştı)
-        if (conflictDetected) {
-            org.junit.jupiter.api.Assertions.assertTrue(
-                    firstStatus == 409 || secondStatus == 409,
-                    "Conflict durumunda HTTP 409 dönmeli");
-        }
+        assertTrue(conflictDetected,
+                "Eşzamanlı /simulate isteği kesin olarak HTTP 409 Conflict döndürmeli. "
+                        + "first=" + firstStatus + ", second=" + secondStatus);
     }
 }

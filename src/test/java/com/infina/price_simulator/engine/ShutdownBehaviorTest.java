@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * PriceWorker'ın shutdown, interrupt ve PoisonPill davranışlarını otomatik olarak doğrular.
  *
  * Bu testler manuel thread dump gerektirmez; tamamen otonom çalışır.
+ * Senkronizasyon için Thread.sleep() yerine CountDownLatch ve thread state polling kullanılır.
  */
 class ShutdownBehaviorTest {
 
@@ -35,6 +36,27 @@ class ShutdownBehaviorTest {
             "ETH", new UnsafeCoinState("ETH", 3_000L),
             "SOL", new UnsafeCoinState("SOL", 150L)
     );
+
+    /**
+     * Belirtilen öneke sahip en az {@code expectedCount} kadar thread'in
+     * WAITING durumuna geçmesini bekler (BlockingQueue.take() üzerinde bloke).
+     * Thread.sleep() yerine deterministik thread-state polling kullanılır.
+     */
+    private static void awaitWorkersWaiting(String namePrefix, int expectedCount, long timeoutMs)
+            throws InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            long waitingCount = Thread.getAllStackTraces().keySet().stream()
+                    .filter(t -> t.getName().startsWith(namePrefix))
+                    .filter(t -> t.getState() == Thread.State.WAITING)
+                    .count();
+            if (waitingCount >= expectedCount) {
+                return;
+            }
+            Thread.yield();
+        }
+        // Timeout doldu; test devam eder — awaitTermination ile zaten doğrulama yapılır
+    }
 
     /**
      * PoisonPill mekanizması: Her worker için bir PoisonPill gönderildiğinde
@@ -62,7 +84,9 @@ class ShutdownBehaviorTest {
             ));
         }
 
-        // Worker'lar kuyruğu beklerken PoisonPill gönder
+        // Worker'lar BlockingQueue.take() üzerinde WAITING durumuna geçene kadar bekle
+        awaitWorkersWaiting("safe-worker-", workerCount, 2_000);
+
         taskQueue.putPoisonPills(workerCount);
 
         executor.shutdown();
@@ -99,8 +123,10 @@ class ShutdownBehaviorTest {
             ));
         }
 
-        // Worker'lar kuyruğu beklerken interrupt et
-        Thread.sleep(50); // Worker'ların BlockingQueue.take() içinde olmasını bekle
+        // Thread.sleep() yerine: worker'ların BlockingQueue.take() üzerinde WAITING durumuna
+        // geçmesini deterministik olarak bekle
+        awaitWorkersWaiting("safe-worker-", workerCount, 2_000);
+
         executor.shutdownNow();
 
         boolean terminated = executor.awaitTermination(3, TimeUnit.SECONDS);
@@ -137,8 +163,10 @@ class ShutdownBehaviorTest {
             ));
         }
 
-        // Thread adlarını doğrula
-        Thread.sleep(50);
+        // Thread.sleep() yerine: unsafe-worker'ların WAITING durumuna geçmesini bekle
+        awaitWorkersWaiting("unsafe-worker-", workerCount, 2_000);
+
+        // Thread adlarını WAITING durumuna geçtikten sonra doğrula
         boolean hasUnsafeWorkerThreads = Thread.getAllStackTraces().keySet().stream()
                 .anyMatch(t -> t.getName().startsWith("unsafe-worker-"));
         assertTrue(hasUnsafeWorkerThreads,
@@ -154,8 +182,10 @@ class ShutdownBehaviorTest {
 
     /**
      * Görevler kuyrukta işlenirken executor sonlandırıldığında
-     * kalan görevlerin kuyrukta kaldığı ve latch'in eksik kaldığı doğrulanır.
-     * Bu, yarım kalan simülasyonun neden doğrulama yapılmaması gerektiğini kanıtlar.
+     * worker'ların temiz şekilde çıktığı doğrulanır.
+     *
+     * <p>Senkronizasyon: worker'ların başladığını doğrulamak için WAITING olmayan
+     * (yani aktif çalışan) thread sayısı beklenir. Thread.sleep() kullanılmaz.</p>
      */
     @Test
     void shutdownDuringProcessingShouldNotCorruptWorkerInternals() throws Exception {
@@ -180,15 +210,22 @@ class ShutdownBehaviorTest {
             ));
         }
 
-        // Sadece birkaç görev ekle (tamamı değil)
+        // Worker'lar kuyruğu beklerken görevleri ekle
         for (int i = 0; i < 10; i++) {
             taskQueue.put(new com.infina.price_simulator.model.PriceUpdateTask(
                     (long) i, "BTC", 1L
             ));
         }
 
-        // Worker'lar henüz tüm görevleri bitirmeden interrupt et
-        Thread.sleep(20);
+        // Worker'ların en az bir görevi işlemeye başladığını CountDownLatch ile doğrula.
+        // Latch'in başlangıç değeri taskCount=100, dolayısıyla herhangi bir görev işlenince
+        // count < taskCount olur. Bunu poll ile kontrol ediyoruz — Thread.sleep() yok.
+        long deadline = System.currentTimeMillis() + 2_000;
+        while (System.currentTimeMillis() < deadline) {
+            if (completionLatch.getCount() < taskCount) break;
+            Thread.yield();
+        }
+
         executor.shutdownNow();
         boolean terminated = executor.awaitTermination(3, TimeUnit.SECONDS);
 
