@@ -1,4 +1,6 @@
 HELP.md
+
+# Maven / build çıktıları
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -18,6 +20,7 @@ target/
 *.iws
 *.iml
 *.ipr
+out/
 
 ### NetBeans ###
 /nbproject/private/
@@ -31,3 +34,17 @@ build/
 
 ### VS Code ###
 .vscode/
+.settings/
+
+
+# Log ve geçici dosyalar
+*.log
+*.tmp
+
+# Ortam / gizli dosyalar (şifre, anahtar) — ASLA commit etmeyin
+.env
+*.env
+
+# İşletim sistemi
+.DS_Store
+Thumbs.db
