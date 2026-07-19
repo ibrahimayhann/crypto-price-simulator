@@ -15,16 +15,18 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String BAD_REQUEST_MSG = "Bad Request";
 
     @ExceptionHandler(SimulationAlreadyRunningException.class)
     public ResponseEntity<ErrorResponse> handleSimulationAlreadyRunning(SimulationAlreadyRunningException ex, HttpServletRequest request) {
         ErrorResponse error = new ErrorResponse(
-                LocalDateTime.now(),
+                LocalDateTime.now(ZoneId.systemDefault()),
                 HttpStatus.CONFLICT.value(),
                 "Conflict",
                 ex.getMessage(),
@@ -36,7 +38,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SimulationNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleSimulationNotFound(SimulationNotFoundException ex, HttpServletRequest request) {
         ErrorResponse error = new ErrorResponse(
-                LocalDateTime.now(),
+                LocalDateTime.now(ZoneId.systemDefault()),
                 HttpStatus.NOT_FOUND.value(),
                 "Not Found",
                 ex.getMessage(),
@@ -53,9 +55,9 @@ public class GlobalExceptionHandler {
                 .orElse("Validation failed");
 
         ErrorResponse error = new ErrorResponse(
-                LocalDateTime.now(),
+                LocalDateTime.now(ZoneId.systemDefault()),
                 HttpStatus.BAD_REQUEST.value(),
-                "Bad Request",
+                BAD_REQUEST_MSG,
                 errorMessage,
                 request.getRequestURI()
         );
@@ -70,9 +72,9 @@ public class GlobalExceptionHandler {
                 .orElse("Validation failed");
 
         ErrorResponse error = new ErrorResponse(
-                LocalDateTime.now(),
+                LocalDateTime.now(ZoneId.systemDefault()),
                 HttpStatus.BAD_REQUEST.value(),
-                "Bad Request",
+                BAD_REQUEST_MSG,
                 errorMessage,
                 request.getRequestURI()
         );
@@ -82,9 +84,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex, HttpServletRequest request) {
         ErrorResponse error = new ErrorResponse(
-                LocalDateTime.now(),
+                LocalDateTime.now(ZoneId.systemDefault()),
                 HttpStatus.BAD_REQUEST.value(),
-                "Bad Request",
+                BAD_REQUEST_MSG,
                 ex.getMessage(),
                 request.getRequestURI()
         );
@@ -96,7 +98,7 @@ public class GlobalExceptionHandler {
         LOGGER.error("Unhandled exception on {}", request.getRequestURI(), ex);
 
         ErrorResponse error = new ErrorResponse(
-                LocalDateTime.now(),
+                LocalDateTime.now(ZoneId.systemDefault()),
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "Internal Server Error",
                 "An unexpected error occurred.",
